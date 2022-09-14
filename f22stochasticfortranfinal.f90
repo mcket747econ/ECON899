@@ -317,12 +317,14 @@ use params_grid
 implicit none
 
 write(*,*) ""
-write (*,*) "Writing PFs to DAT file"
+write (*,*) 'k','v_good','v_bad','policy_consumption','policy_k', "Writing PFs to DAT file"
 open(unit = 2, file = 'pfs_neogrowth.dat', status = 'replace', action = 'write', iostat = i_stat)
-200 format(f25.15,2x,f25.15,2x,f25.15,2x,f25.15,2x,f25.15,2x,f25.15,2x,f25.15,2x,f25.15,2x)
+200 format(f25.15,2x,f25.15,2x,f25.15,2x,f25.15,2x,f25.15,2x,f25.15,2x,f25.15,2x,f25.15,2x,f25.15,2x,f25.15x,2x,f25.15x,2x)
 
 do i_k = 1,n_k
-     write(2,200) grid_k(i_k), grid_z(i_z), pf_c(i_k,i_z), pf_k(i_k,i_z), pf_v(i_k,i_z)
+	!do i_z = 1,n_z
+	write(2,200) grid_k(i_k), pf_v(i_k,1),pf_v(i_k,2), pf_c(i_k,1),pf_c(i_k,2), pf_k(i_k,1),pf_k(i_k,2)
+	!end do
 end do
 
 return
