@@ -1,6 +1,4 @@
-#keyword-enabled structure to hold model primitives
-#using Distributed
-#addprocs(2)
+#Original Code written in 2021, Modified by Matt McKetty Fall 2022
 @everywhere using SharedArrays #must use shared arrays in order to allow for arrays to be updated while using parallel processing
 @everywhere using Pkg;Pkg.add(["Plots","Parameters"])
 @everywhere using Parameters, Plots #Load Necessary Packages
