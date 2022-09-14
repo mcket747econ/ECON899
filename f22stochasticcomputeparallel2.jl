@@ -1,14 +1,16 @@
 #import the libraries we want
-using Distributed
-addprocs(2)
-@everywhere using Pkg;Pkg.add(["Plots","Parameters"])
+
+# Original Code from Fall 2021 Modified by Matt McKetty Fall 2022\
+using Distributed ##Add distributed package to enable parallel processing
+addprocs(2) #State the number of processes to run
+@everywhere using Pkg;Pkg.add(["Plots","Parameters"]) #Add other relevant packages
 @everywhere using Parameters, Plots
 @everywhere include("f22stochasticmodelparallel.jl") #import the functions that solve our growth model
 
 @everywhere @time prim, res = Initialize() #initialize primitive and results structs
 @everywhere @time Solve_model(prim, res) #solve the model!
-@everywhere @unpack val_func, pol_func = res
-@everywhere @unpack k_grid = prim
+@everywhere @unpack val_func, pol_func = res #extract results for plots
+@everywhere @unpack k_grid = prim #extract k array from primitive structure
 
 ##############Make plots
 #value function
