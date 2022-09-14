@@ -1,40 +1,5 @@
-! ************************************************************************
-! Filename : neogrowth_deterministic.f90
-!
-! Author : Philip Coyle
-!
-! Date Created : September 7th, 2021
-!
-! Description : This program will use dynamic programming techniques to solve
-! a simple neoclassical growth model with a two state markov productivity shock.
-!
-! Notes:
-! I run my fortan code from the terminal. I included the commands I need to run
-! in the terminal.
-! First, I chage into the appropriate directory.
-! Second I compile the code. gfortran is my compiler. I will go over what all the dashes mean when we meet.
-! Finally, I run the compiled (machine readbale) code. This is running the program.
-! You should update the path -- the part that is "cd ..." -- to where you store the file.
-!
-! Routine:
-! cd /Users/philipcoyle/Documents/School/University_of_Wisconsin/ThirdYear/Fall_2021/TA\ -\ Computation/ProblemSets/PS1/Fortran
-! gfortran -O2 -o neogrowth_deterministic neogrowth_deterministic.f90
-! ./neogrowth_deterministic
-! ************************************************************************
+!!Stochastic version of code by Philip Coyle 
 
-! ************************************************************************
-! ------------------------------------------------------------------------
-! ------------------------------------------------------------------------
-! module : params_grid
-!
-! Description : This module will form the foudation for our program. In it
-! we will allocate space for all paramaters used in this program and set up the
-! grids to create a discritized state space
-! ------------------------------------------------------------------------
-! ------------------------------------------------------------------------
-
-
-module params_grid
 
 implicit none
 
