@@ -1,5 +1,19 @@
-!!Stochastic version of code by Philip Coyle 
+!Stochastic version of code by Philip Coyle
+! ************************************************************************
 
+! ************************************************************************
+! ------------------------------------------------------------------------
+! ------------------------------------------------------------------------
+! module : params_grid
+!
+! Description : This module will form the foudation for our program. In it
+! we will allocate space for all paramaters used in this program and set up the
+! grids to create a discritized state space
+! ------------------------------------------------------------------------
+! ------------------------------------------------------------------------
+
+
+module params_grid
 
 implicit none
 
@@ -96,7 +110,7 @@ write(*,*) "Total elapsed time = ", real(end - beginning) / real(rate)," seconds
 write(*,*) "******************************************************"
 
 ! Write results
-! call coda()
+call coda()
 
 write(*,*) ""
 write(*,*) "**************************************"
@@ -308,9 +322,10 @@ open(unit = 2, file = 'pfs_neogrowth.dat', status = 'replace', action = 'write',
 200 format(f25.15,2x,f25.15,2x,f25.15,2x,f25.15,2x,f25.15,2x,f25.15,2x,f25.15,2x,f25.15,2x)
 
 do i_k = 1,n_k
-     write(2,200) grid_k(i_k), pf_c(i_k,i_z), pf_k(i_k,i_z), pf_v(i_k,i_z)
+     write(2,200) grid_k(i_k), grid_z(i_z), pf_c(i_k,i_z), pf_k(i_k,i_z), pf_v(i_k,i_z)
 end do
 
 return
 
 end subroutine coda
+
