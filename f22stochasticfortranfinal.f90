@@ -1,4 +1,5 @@
 !Stochastic version of code by Philip Coyle
+!Modified by Matt McKetty September 2021
 ! ************************************************************************
 
 ! ************************************************************************
@@ -37,7 +38,7 @@ integer 										:: 				converged		= 0			! Dummy for VFI Convergence
 ! ****************************GRID SET**********************************
 ! -----------------------------------------------------------------------
 ! Set up for discritizing the state space (Capital Grid)
-integer						 				  :: 				i_k, i_kpr,i_z																				! Ieration Counters for k_today and k_tomorrow grid
+integer						 				  :: 				i_k, i_kpr,i_z		!Declare indices for productivity and capital																		! Ieration Counters for k_today and k_tomorrow grid
 integer, parameter 				  :: 				n_k 				= 1000																! Size of k grid
 double precision 						:: 				grid_k(n_k)																				! Allocate Space for k grid
 double precision, parameter :: 				min_k 			= 0.01d0															! Minimum of k grid
@@ -45,9 +46,9 @@ double precision, parameter :: 				max_k 			= 60d0																! Maximum of k
 double precision, parameter :: 				step_k 			= (max_k - min_k)/(dble(n_k) - 1d0) 	! Step of k grid
 double precision					  :: 				k_today
 double precision					  :: 				k_tomorrow
-integer, parameter::	 n_z = 2
-double precision:: grid_z(2) = [1.25,.20]
-double precision, dimension(3,3) :: p_matrix 
+integer, parameter::	 n_z = 2 !Declare length of productivity array
+double precision:: grid_z(2) = [1.25,.20] !Productivity array
+
 
 
 ! Global variables for Dynamic Progamming
@@ -59,13 +60,13 @@ double precision 						:: 				k_tomorrow_max
 double precision 						:: 				v_today
 double precision 						:: 				v_today_temp
 double precision 						:: 				v_tomorrow
-double precision                        ::              z_today
+double precision                        ::              z_today !Today's z value
 
 
 ! Allocating space for Policy Functions
-double precision 						:: 				pf_c(n_k,n_z) ! Allocate Space for Conumption Policy Function
-double precision 						:: 				pf_k(n_k,n_z) ! Allocate Space for Capital Policy Function
-double precision 						:: 				pf_v(n_k,n_z) ! Allocate Space for Value Function
+double precision 						:: 				pf_c(n_k,n_z) ! Allocate Space for Conumption Policy Function, 2 dimensions
+double precision 						:: 				pf_k(n_k,n_z) ! Allocate Space for Capital Policy Function, 2 dimensions
+double precision 						:: 				pf_v(n_k,n_z) ! Allocate Space for Value Function, 2 dimensions
 integer 								::			    i_stat   ! Used for writing data after program has run.
 
 end module params_grid
