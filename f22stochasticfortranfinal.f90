@@ -155,7 +155,7 @@ do i_k = 1,n_k
 end do
 
 ! Setting up Policy Function guesses
-do i_k = 1,n_k
+do i_k = 1,n_k !Nested loop because this is 2 dimensional
 	do i_z = 1,n_z
 
 		pf_c(i_k,i_z) 			    = 0d0
@@ -170,16 +170,6 @@ return
 
 end subroutine housekeeping
 
-
-
-subroutine hello()
-    implicit none
-    real :: markov_array(2,2)
-    markov_array = reshape([0.997,0.024,0.023,0.926], [2,2])
-    print *, markov_array(1,:)
-    print *, markov_array(2,:)
-	return 
-end subroutine hello
 
 
 
@@ -201,7 +191,7 @@ use params_grid
 
 
 implicit none
-! allocating space for policy function updates
+! allocating space for policy function updates, 2 dimensional
 double precision 						:: 				pf_c_up(n_k,n_z)
 double precision 						:: 				pf_k_up(n_k,n_z)
 double precision 						:: 				pf_v_up(n_k,n_z)
@@ -211,7 +201,7 @@ double precision 						:: 				diff_k
 double precision 						:: 				diff_v
 double precision 						:: 				max_diff
 
-real :: markov_array(2,2) = reshape([0.997,0.024,0.023,0.926], [2,2])
+real :: markov_array(2,2) = reshape([0.997,0.024,0.023,0.926], [2,2]) !Initialize our probability/transition matrix
 converged = 0
 it = 1
 
@@ -220,7 +210,7 @@ it = 1
 do while (converged == 0 .and. it < max_it)
 
 	do i_k = 1,n_k ! Loop over all possible capital states
-		do i_z = 1,n_z
+		do i_z = 1,n_z ! Loop over possible productivity states
 
 
 		! ***********************************
@@ -239,7 +229,8 @@ do while (converged == 0 .and. it < max_it)
 
 				! some values are "temp" values because we are searching exaustively for the capital/consumption choice that maximizes value
 				c_today_temp = y_today + (1-cDEL)*k_today - k_tomorrow
-				v_tomorrow = dot_product(pf_v(i_kpr,:),markov_array(i_z,1:2))
+				v_tomorrow = dot_product(pf_v(i_kpr,:),markov_array(i_z,1:2)) !v tomorrow is the dot product of the vector of possible v's and the probability vector 
+				                                                              !giving the likelihood of each of those v's occurring. 
 
 
 				c_today_temp = max(0d0,c_today_temp)
