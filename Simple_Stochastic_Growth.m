@@ -41,10 +41,10 @@ end
 %out well. So I split up my utility and consumption into two different
 %matrices, one per state
 
-us_high = us(:,:,1);
-us_low = us(:,:,2);
-visr_high = us_high(:,1)';
-visr_low = us_low(:,1)';
+us_good = us(:,:,1);
+us_bad = us(:,:,2);
+visr_good = us_good(:,1)';
+visr_bad = us_bad(:,1)';
 
 
 
@@ -56,31 +56,26 @@ pcntol=1; %tolerance for value function iteration
 n=1; %if want to run vfi for a set number of iterations
 while pcntol >.0001
 
-   vis_high = c1*visr_high; %generates future value function matrix from above row vector; will include the transition matrix later one
-   vis_low = c1*visr_low;
+   vis_good = c1*visr_good; %generates future value function matrix from above row vector; will include the transition matrix later one
+   vis_bad = c1*visr_bad;
 
 
    %CONSTRUCT TOTAL RETURN FUNCTION
-   wis_high = us_high+b*(vis_high*Q(1,1)+vis_low*Q(1,2)); 
-   wis_low = us_low+b*(vis_low*Q(2,2)+vis_high*Q(2,1)); 
+   wis_good = us_good+b*(vis_good*Q(1,1)+vis_bad*Q(1,2)); 
+   wis_bad = us_bad+b*(vis_bad*Q(2,2)+vis_good*Q(2,1)); 
 
    %CHOOSE HIGHEST VALUE (ASSOCIATED WITH k' CHOICE)
-   [vsr_high,I_high]=max(wis_high'); %since max gives highest element in each column of a matrix, I is the decision rule while vsr is the placeholder value function
-   [vsr_low,I_low]=max(wis_low');
+   [vsr_good,I_good]=max(wis_good'); %since max gives highest element in each column of a matrix, I is the decision rule while vsr is the placeholder value function
+   [vsr_bad,I_bad]=max(wis_bad');
    
-   tol=max([abs(vsr_high-visr_high), abs(vsr_low-visr_low)]); %use sup norm for tolerance
-   pcntol=tol/abs(vsr_low(1,N));
-   visr_high = vsr_high;%update value functions
-   visr_low = vsr_low;
+   tol=max([abs(vsr_good-visr_good), abs(vsr_bad-visr_bad)]); %use sup norm for tolerance
+   pcntol=tol/abs(vsr_bad(1,N));
+   visr_good = vsr_good;%update value functions
+   visr_bad = vsr_bad;
    n=n+1; 
 end
-save 899_PS1vdr vsr_low vsr_high I_low I_high k;
+save 899_PS1vdr vsr_bad vsr_good I_bad I_good k;
 save 899_PS1parm b a 
-
-%Troubleshooting: The values are clearly wrong because they are decreasing.
-%That being said, I don't know why. All the dimensions are right, but I
-%think I might be calculating vsr wrong (not incorporating the income from that time period?). 
-% Should be an easy fix if I can figure out why.
 
 toc %because who cares how fast the graphs take
 %%
@@ -88,8 +83,8 @@ toc %because who cares how fast the graphs take
 %% First figure
 figure(1);
 hold on;
-plot(k, vsr_high, 'r'); 
-plot(k, vsr_low, 'b'); 
+plot(k, vsr_good, 'r'); 
+plot(k, vsr_bad, 'b'); 
 xlabel('k_t');
 ylabel('V(k,z)'); 
 legend({'Z=1.25', 'Z=.2'}, 'Location',"best");
@@ -99,8 +94,8 @@ hold off;
 %% Second Figure
 figure(2);
 hold on
-plot(k, k([I_high]), 'r');
-plot(k,k([I_low]),'b')
+plot(k, k([I_good]), 'r');
+plot(k,k([I_bad]),'b')
 xlabel('k_t');
 legend({'Z=1.25', 'Z=.2'}, 'Location', "best")
 
@@ -110,8 +105,8 @@ hold off;
 %% Third figure
 figure(3);
 hold on;
-plot(k, k([I_high])-k, 'r');
-plot(k,k([I_low])-k,'b')
+plot(k, k([I_good])-k, 'r');
+plot(k,k([I_bad])-k,'b')
 xlabel('k_t');
 legend({'Z=1.25', 'Z=.2'}, 'Location', "best")
 
