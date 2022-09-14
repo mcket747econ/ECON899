@@ -70,10 +70,6 @@ double precision 						:: 				pf_v(n_k,n_z) ! Allocate Space for Value Function,
 integer 								::			    i_stat   ! Used for writing data after program has run.
 
 end module params_grid
-!p_matrix(1) = 0.977
-!p_matrix(2) = 0.023
-!p_matrix(3) = 0.074
-!p_matrrix(4) = 0.926
 
 
 ! ************************************************************************
@@ -216,8 +212,8 @@ do while (converged == 0 .and. it < max_it)
 		! ***********************************
 		! Define the today's state variables
 		! ***********************************
-			k_today = grid_k(i_k)
-			z_today = grid_z(i_z)
+			k_today = grid_k(i_k) !Today's level of capital
+			z_today = grid_z(i_z) !Today's state
 
 			! ******************************************************
 			! Solve for the optimal consumption / capital investment
