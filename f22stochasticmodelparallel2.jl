@@ -1,10 +1,10 @@
 #keyword-enabled structure to hold model primitives
 #using Distributed
 #addprocs(2)
-@everywhere using SharedArrays
+@everywhere using SharedArrays #must use shared arrays in order to allow for arrays to be updated while using parallel processing
 @everywhere using Pkg;Pkg.add(["Plots","Parameters"])
-@everywhere using Parameters, Plots
-@everywhere @with_kw struct Primitives
+@everywhere using Parameters, Plots #Load Necessary Packages
+@everywhere @with_kw struct Primitives #Intialize model primitives
 
     β::Float64 = 0.99 #discount rate
     δ::Float64 = 0.025 #depreciation rate
@@ -53,18 +53,18 @@ end
     v_next = zeros(nk, nz) #next guess of value function to fill
 
     #for exploiting monotonicity of policy function
-    @sync @distributed  for k_index = 1:nk*nz
+    @sync @distributed  for k_index = 1:nk*nz #Use @sync and @distributed macro to ensure processing is spread out among multiple processors on computer
         candidate_max = -1e10#bad candidate max
-        z_index = mod(k_index,nz) + 1
-        k_index =  mod(ceil(Int64, k_index/nz), nk) + 1
+        z_index = mod(k_index,nz) + 1 #index over good and bad states
+        k_index =  mod(ceil(Int64, k_index/nz), nk) + 1 #index over values of k
         k = k_grid[k_index] #value of k
-        z= z_grid[z_index]
+        z= z_grid[z_index] #values of z
         budget = z*k^α + (1-δ)*k #budget
 
         for kp_index in 1:nk #loop over possible selections of k', exploiting monotonicity of policy function
             c = budget - k_grid[kp_index] #consumption given k' selection
             if c>0 #check for positivity
-                val = log(c) + β*sum(res.val_func[kp_index,:].*markov[z_index, :])#compute value
+                val = log(c) + β*sum(res.val_func[kp_index,:].*markov[z_index, :])#compute new value, sum of log and dot product of possible vs and their probabilities
                 if val>candidate_max #check for new max value
                     candidate_max = val #update max value
                     res.pol_func[k_index,z_index] = k_grid[kp_index] #update policy function #update lowest possible choice
