@@ -19,7 +19,7 @@ mutable struct Results
     pol_func:: Array{Float64,2}
     mu:: Array{Float64,2}
     q:: Float64
-end
+end0
 
 
 function Initialize()
@@ -125,3 +125,29 @@ prim, res = Initialize()
 V_iterate(prim,res)
 dist_iterate(prim,res)
 price_update(prim, res)
+
+function overall_iterate(prim::Primitives, res::Results, tol::Float64 = 1e-4)
+    balance = 100
+    x = 0
+    while abs(balance) > tol
+        x+=1
+        V_iterate(prim,res)
+        dist_iterate(prim,res)
+        balance = aggregate_a = sum(res.mu[:,1] .* prim.A ) + sum(res.mu[:,2] .* prim.A )
+        price_update(prim,res)
+        println("Iteration number: ", x)
+        println("Absolute difference: ", balance)
+    end
+
+
+end
+
+overall_iterate(prim,res)
+
+Plots.plot(prim.A, res.mu, title="Asset Distribution", label = ["Employed" "Unemployed"])
+sum(res.mu[:,])
+sum(res.mu[:,1])
+sum(res.mu[:,2])
+
+
+end
