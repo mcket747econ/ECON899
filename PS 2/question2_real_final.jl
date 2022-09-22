@@ -211,7 +211,7 @@ function plot_Lorenz(dist) #input an ordered distribution
         lorenz[i,2] = S_i[i]/S_n
     end
     Plots.plot(lorenz[:,1],lorenz[:,2], title="Lorenz curve") #basic Lorenz plot
-    Plots.plot!(lorenz[:,1],lorenz[:,1]) #45 degree line
+    Plots.plot!(lorenz[:,1],lorenz[:,1]*25) #45 degree line
 end
 
 
@@ -289,3 +289,7 @@ Plots.plot(we[:,1], we[:,2], title = "Wealth", label = "Employed")
 Plots.plot!(wu[:,1], wu[:,2], title= "Wealth", label = "Unemployed")
 Plots.savefig("C:/Users/mcket/OneDrive/Documents/Fall 2022/ECON899-Computational/899Code/899/ECON899/PS 2/PS_02_wealth_dist.png")
 print(res.q)
+plot_Lorenz(res.mu)
+Plots.savefig("C:/Users/mcket/OneDrive/Documents/Fall 2022/ECON899-Computational/899Code/899/ECON899/PS 2/PS_02_wealth_lorenz.png")
+
+plots
