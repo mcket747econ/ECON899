@@ -181,28 +181,28 @@ function gini(dist) #no need to sort, the distribution is sorted already. Specia
     return gini_in
 end
 
-##Lorenz curve
+##Lorenz Curve
 
-#function plot_Lorenz(dist) #input an ordered distribution
- #   n_d = size(dist,1)
-  #  lorenz = zeros(n_d,2)
-   # lorenz[:,1] = collect(range(0, length = n_d, stop = 1)) #goes from 0 to 1
-   # lorenz[1,2] = dist[1,1]*dist[1,2] #create the first value 
-   # total = 0
-   # count = 0
-   # for i in 2:n_d #loop over rest of curve 
-    #     total = dist[i,1]*dist[i,2] + lorenz[i-1,2] #amount of wealth at gridpoint plus a cumulative summation
-     #    lorenz[i,2] = total
-      #   count = i
-       # if total > .99 #because the bounds aren't working right with all the zeros
-        #    break
-       # else
-        #    continue
-       # end    
-    #end
-    #Plots.plot(lorenz[1:count,1],lorenz[1:count,2], title="Lorenz curve") #basic Lorenz plot  
-    #Plots.plot!(lorenz[1:count,1],lorenz[1:count,1]) #45 degree line
-#end
+function plot_Lorenz(dist) #input an ordered distribution
+    n_d = size(dist,1)
+    lorenz = zeros(n_d,2)
+    #lorenz[:,1] = collect(range(0, length = n_d, stop = 1)) #goes from 0 to 1
+    lorenz[1,2] = dist[1,1]*dist[1,2] #create the first value 
+    S_n = sum(dist[:,2].*dist[:,1])
+    S_i = zeros(n_d)
+    perpop = dist[1,2]
+    for i in 2:n_d #loop over rest of curve 
+        for j in 1:i
+          S_i[i] += dist[j,2]*dist[j,1] 
+        end
+             #amount of wealth at gridpoint plus a cumulative summation
+        perpop += dist[i,2]
+        lorenz[i,1] = perpop 
+        lorenz[i,2] = S_i[i]/S_n    
+    end
+    Plots.plot(lorenz[:,1],lorenz[:,2], title="Lorenz curve") #basic Lorenz plot  
+    Plots.plot!(lorenz[:,1],lorenz[:,1]) #45 degree line
+end
     
 
 overall_iterate(prim,res)
@@ -214,7 +214,7 @@ Plots.plot(prim.A, res.mu, title="Asset Distribution", label = ["Employed" "Unem
 
 wf = wealth(res.mu,prim)
 print("Gini coefficient: ", gini(wf)) 
-#plot_Lorenz(wf) #Plots a Lorenz curve.
+plot_Lorenz(wf) #Plots a Lorenz curve.
 
 
 #sum(res.mu[:,])
