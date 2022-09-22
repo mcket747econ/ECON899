@@ -19,7 +19,7 @@ mutable struct Results
     pol_func:: Array{Float64,2}
     mu:: Array{Float64,2}
     q:: Float64
-end0
+end
 
 
 function Initialize()
@@ -141,13 +141,13 @@ function overall_iterate(prim::Primitives, res::Results, tol::Float64 = 1e-3) #d
 
 
 end
-    
+
 ##gini index stuff
 
 #need a function to create wealth distribution, below should work as mu is an (N,2) array
 function wealth(dist,prim::Primitives) #for turning mu into a wealth distribution
     @unpack na, A, S = prim
-    #first create wealth grids for each state 
+    #first create wealth grids for each state
     wgrid_e = zeros(na,2)
     wgrid_u = zeros(na,2)
     wgrid_e[:,1] = A .+ S[1]
@@ -159,22 +159,22 @@ function wealth(dist,prim::Primitives) #for turning mu into a wealth distributio
     wealth_dist = sortslices(vcat(wgrid_e,wgrid_u),dims = 1) #okay to do this only because no overlap in wealth between the groups
     return wealth_dist
 end
-    
+
 #goal of the above is to turn the two state mu distribution into a single vector of assets plus earnings
 
 function gini(dist) #no need to sort, the distribution is sorted already. Special thanks to Wikipedia and Stack Exchange
     #first column of distribution is wealth, second is probability
-    nrows = size(dist,1) 
+    nrows = size(dist,1)
     S_n = zeros(nrows) #creating a vector for Sn (see wikipedia)
-    for i in 1:nrows #iterate over the different wealths 
-        for j in 1:i #but only up to a certain amount each time 
-        S_n[i] += dist[j,2]*dist[j,1] #summing the weighted wealth over wealth up to that point 
+    for i in 1:nrows #iterate over the different wealths
+        for j in 1:i #but only up to a certain amount each time
+        S_n[i] += dist[j,2]*dist[j,1] #summing the weighted wealth over wealth up to that point
         end
     end
 
     num = 0
     for i in 2:nrows
-        num += dist[i,2]*(S_n[i-1]+S_n[i]) 
+        num += dist[i,2]*(S_n[i-1]+S_n[i])
     end
 
     gini_in = 1 - num/(S_n[length(S_n)])
@@ -187,33 +187,33 @@ function plot_Lorenz(dist) #input an ordered distribution
     n_d = size(dist,1)
     lorenz = zeros(n_d,2)
     #lorenz[:,1] = collect(range(0, length = n_d, stop = 1)) #goes from 0 to 1
-    lorenz[1,2] = dist[1,1]*dist[1,2] #create the first value 
+    lorenz[1,2] = dist[1,1]*dist[1,2] #create the first value
     S_n = sum(dist[:,2].*dist[:,1])
     S_i = zeros(n_d)
     perpop = dist[1,2]
-    for i in 2:n_d #loop over rest of curve 
+    for i in 2:n_d #loop over rest of curve
         for j in 1:i
-          S_i[i] += dist[j,2]*dist[j,1] 
+          S_i[i] += dist[j,2]*dist[j,1]
         end
              #amount of wealth at gridpoint plus a cumulative summation
         perpop += dist[i,2]
-        lorenz[i,1] = perpop 
-        lorenz[i,2] = S_i[i]/S_n    
+        lorenz[i,1] = perpop
+        lorenz[i,2] = S_i[i]/S_n
     end
-    Plots.plot(lorenz[:,1],lorenz[:,2], title="Lorenz curve") #basic Lorenz plot  
+    Plots.plot(lorenz[:,1],lorenz[:,2], title="Lorenz curve") #basic Lorenz plot
     Plots.plot!(lorenz[:,1],lorenz[:,1]) #45 degree line
 end
-    
+
 
 overall_iterate(prim,res)
 
 Plots.plot(prim.A,res.pol_func, title = "Decision Rules", label = ["Employed" "Unemployed"])
 Plots.plot!(prim.A,Prim.A) #45 degree line on above plot
-    
+
 Plots.plot(prim.A, res.mu, title="Asset Distribution", label = ["Employed" "Unemployed"])
 
 wf = wealth(res.mu,prim)
-print("Gini coefficient: ", gini(wf)) 
+print("Gini coefficient: ", gini(wf))
 plot_Lorenz(wf) #Plots a Lorenz curve.
 
 
