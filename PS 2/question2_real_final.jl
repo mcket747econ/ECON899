@@ -234,7 +234,7 @@ sum(res.mu[:,2])
 
 c = 1*(0.9433962264150745) + .5*(1-0.9433962264150745)
 
-WFB= ((c^(1-α))-1)/(1-α)/(1-.9932)
+WFB= ((c^(1-1.5))-1)/(1-1.5)/(1-.9932)
 function lambda(prim::Primitives,res::Results,WFB)
     @unpack A, β, α, na, ne, S, Π = prim
     @unpack val_func, mu = res
@@ -275,12 +275,11 @@ function welfare_vote(prim::Primitives,res::Results,lam)
 end
 
 xyz = lambda(prim,res,WFB)
-sum(res)|
+
 
 Plots.plot(prim.A, xyz, title = "Consumption Equivalence", label = ["Employed" "Unemployed"])
 Plots.savefig("C:/Users/mcket/OneDrive/Documents/Fall 2022/ECON899-Computational/899Code/899/ECON899/PS 2/PS_02_consump_equivalence.png")
 
-lambda
 welf = welfare(prim,res,xyz)
 print(welf)
 print(xyz)
