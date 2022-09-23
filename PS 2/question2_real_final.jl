@@ -288,7 +288,7 @@ Plots.plot(we[:,1], we[:,2], title = "Wealth", label = "Employed")
 Plots.plot!(wu[:,1], wu[:,2], title= "Wealth", label = "Unemployed")
 Plots.savefig("C:/Users/mcket/OneDrive/Documents/Fall 2022/ECON899-Computational/899Code/899/ECON899/PS 2/PS_02_wealth_dist.png")
 print(res.q)
-plot_Lorenz(res.mu)
+plot_Lorenz(wf)
 Plots.savefig("C:/Users/mcket/OneDrive/Documents/Fall 2022/ECON899-Computational/899Code/899/ECON899/PS 2/PS_02_wealth_lorenz.png")
 
 plots
