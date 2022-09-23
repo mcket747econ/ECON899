@@ -210,8 +210,8 @@ function plot_Lorenz(dist) #input an ordered distribution
         lorenz[i,1] = perpop
         lorenz[i,2] = S_i[i]/S_n
     end
-    Plots.plot(lorenz[:,1],lorenz[:,2], title="Lorenz curve") #basic Lorenz plot
-    Plots.plot!(lorenz[:,1],lorenz[:,1]*25) #45 degree line
+    Plots.plot(lorenz[:,1],lorenz[:,2], title="Lorenz curve", label = "Lorenz") #basic Lorenz plot
+    Plots.plot!(lorenz[:,1],lorenz[:,1], label = "Perfect Equality") #45 degree line
 end
 
 
