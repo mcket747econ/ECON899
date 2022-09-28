@@ -68,9 +68,11 @@ function Bellman(prim::Primitives,res::Results)
     end
     v_next
 end
-
-prim, res = Initialize()
-V_iterate(prim,res)
+function run1()
+    prim, res = Initialize()
+    V_iterate(prim,res)
+end
+run1()
 Plots.plot(prim.A,res.val_func,title = 'Self-Test Graph',label=['Good State' 'Bad State'])
 Plots.plot(prim.A,res.pol_func,title= "Self Test Policy Graph", label=['Good State' 'Bad State'])
 

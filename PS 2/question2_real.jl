@@ -1,5 +1,6 @@
 # using Pkg; Pkg.add(["Plots","Parameters"])
 using Plots, Parameters
+
 @with_kw struct Primitives
     β::Float64 = 0.9932 #Discount Rate
     b::Float64 = 0.5 #Unemployment Benefits
