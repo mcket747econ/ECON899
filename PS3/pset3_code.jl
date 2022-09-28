@@ -35,7 +35,7 @@ using Plots, Parameters
        1.0200000,
        1.0110000]
 
-
+##Make a matrix
 
 
 end
@@ -46,7 +46,7 @@ mutable struct Results
     val_func:: Array{Float64,3}
     #asset_func:: Array{Float64,3}
     lab_func:: Array{Float64,3}
-    v_final::Array{Float64,3}
+    #v_final::Array{Float64,3}
     age_j:: Int64
     r:: Float64
     w:: Float64
@@ -64,7 +64,7 @@ function Initialize()
     pol_func = zeros(prim.na,prim.nz,prim.N)
     val_func = zeros(prim.na,prim.nz,prim.N)
     lab_func = zeros(prim.na,prim.nz,prim.N)
-    v_final = zeros(prim.na,prim.nz,prim.N)
+    #v_final = zeros(prim.na,prim.nz,prim.N)
     age_j = 66
     r = 0.05
     w = 1.05
@@ -72,7 +72,7 @@ function Initialize()
     mu = zeros(prim.na,prim.nz)
     K = 3
     L = 0.5
-    res = Results(pol_func,val_func, lab_func,v_final,age_j, r,w,b,mu, K, L)
+    res = Results(pol_func,val_func, lab_func,age_j, r,w,b,mu, K, L)
     prim, res
 end
 
@@ -82,21 +82,23 @@ end
 
 function Backinduct(prim::Primitives,res::Results)
     @unpack age_retire, theta, gamma, sigma, z_prod, birth_distribution = prim
-    @unpack markov, alpha, delta, beta, N, Assets, na, nz, age_ef = prim
-    res.v_final= zeros(na,nz,N)
-    w = 1.05
-    r = 0.05
-    b = 0.2
-    K = 3.3
-    L = 0.3
-    v_0=1e-10
+    @unpack markov, alpha, delta, beta, N,Assets, na, nz, age_ef = prim
+    @unpack w,r,b = res
+    #res.v_final= zeros(na,nz,N)
+    # w = 1.05
+    # r = 0.05
+    # b = 0.2
+    # K = 3.3
+    # L = 0.3
+
     for age_index = 66:-1:1
-        v_0 = -1e10
         #if age_index == 66
+
         for a_index = 1:na, z_index=1:nz
+            v_0 = -1e10
             #for a_index = 1:na, z_index=1:nz
             if age_index == 66
-                budget = (1+r)*Assets[a_index]
+                budget = (1+r)*Assets[a_index] + b
                 c = budget
                 if c > 0
                     val =  (c^((1-sigma)*gamma))/(1-sigma)
@@ -105,53 +107,61 @@ function Backinduct(prim::Primitives,res::Results)
                         res.lab_func[a_index,:,age_index] .= zero(UInt32)
                          #I am addi
                         v_0 = val
-                        res.val_func[:,:,66] .= v_0 ##Add the value function over all asset levels for those in the final period of life.
-                        res.v_final[:,:,66] .= v_0
+                        res.val_func[a_index,:,age_index] .= v_0 ##Add the value function over all asset levels for those in the final period of life.
+                        #res.v_final[:,:,66] .= v_0
                     end
                 end
 
 
             elseif age_index >= 46 && age_index < 66
             #for a_index = 1:na, z_index = 1:nz
-                budget = (1+r)*a + b
+                budget = (1+r)*Assets[a_index] + b
                 for ap_index = 1:na, zp_index = 1:nz
                     c = budget - Assets[ap_index]
                     if c > 0
-                        val =(c^((1-sigma)*gamma))/(1-sigma)+ beta*res.val_func(Assets[ap_index],:,age_index+1)
+                        val =(c^((1-sigma)*gamma))/(1-sigma)+ beta*res.val_func[ap_index,zp_index,age_index+1]
                         if val > v_0
-                            res.pol_func[a_index,z_index,age_index] = Asset[ap_index]
+                            res.pol_func[a_index,:,age_index] .= Assets[ap_index]
                             res.lab_func[a_index,:, age_index] .= zero(UInt32)
                             v_0 = val
+                            res.val_func[a_index,:,age_index] .= v_0
                         end
                     end
                 end
-                res.val_func[:,:,age_index] .= val
-                res.v_final[:,:,age_index] .= val
+                #res.val_func[:,:,age_index] .= val
+                #res.v_final[:,:,age_index] .= val
         #else age_index < 46
             else age_index < 46
             #for a_index = 1:na, z_index = 1:nz
-                for ap_index = 1:na, zp_index = 1:nz
-                    l = (gamma*(1-theta)*productivity(z_prod[z_index],age_ef,age_index)*w-(1-gamma)*((1+r)*Assets[a_index]-Assets[ap_index]))/((1-theta)*w*productivity(z_prod[z_index],age_ef[age_index]))
+                for ap_index = 1:na, #zp_index = 1:nz
+                    l = (gamma*(1-theta)*productivity(z_prod[z_index],age_ef[age_index])*w-(1-gamma)*((1+r)*Assets[a_index]-Assets[ap_index]))/((1-theta)*w*productivity(z_prod[z_index],age_ef[age_index]))
+                    if l < 0
+                        l = 0
+                    elseif l > 1
+                        l = 1
+                    end
                     budget = (1+r)*Assets[a_index] + w*(1-theta)*productivity(z_prod[z_index],age_ef[age_index])*l
                     c = budget - Assets[ap_index]
                     if c > 0
-                        val = (((c^(gamma))*(1-l)^(1-gamma))^(1-sigma))/(1-sigma) + beta*sum(res.val_func[Assets[ap_index],:,age_index].*markov[z_index,:])
+                        val = (((c^(gamma))*(1-l)^(1-gamma))^(1-sigma))/(1-sigma) + beta*sum(res.val_func[ap_index,:,age_index+1].*markov[z_index,:])
                         if val > v_0
-                            res.pol_func[a_index,z_index,age_index] = Asset[ap_index]
-                            res.lab_func[a_index,z_index,age_index] .= l(UInt32)
+                            res.pol_func[a_index,z_index,age_index] = Assets[ap_index]
+                            res.lab_func[a_index,z_index,age_index] = l
                             v_0 = val
+                            res.val_func[a_index,z_index,age_index] = v_0
+
                         end
                     end
                 end
-                res.val_func[:,:,age_index] .= v_0
+                #res.val_func[:,:,age_index] .= v_0 You've already taken care of this within the previous loops
 
             end
-            res.v_final[:,:,age_index] .= v_0
+            #res.v_final[:,:,age_index] .= v_0
         end
     end
-    return res.v_final, res.pol_func, res.lab_func
+    return res.val_func, res.pol_func, res.lab_func
 end
 
 prim, res = Initialize()
-res.v_final= zeros(prim.na,prim.nz,prim.N)
-res.v_final, res.pol_func, res.lab_func .= Backinduct(prim,res)
+#res.v_final= zeros(prim.na,prim.nz,prim.N)
+ Backinduct(prim,res)
