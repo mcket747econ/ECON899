@@ -1,17 +1,17 @@
 #Problem Set 3 Code
 using Plots, Parameters
 @with_kw struct Primitives
-    age_retire::Int64 = 46
-    theta::Float64 = 0.11
-    gamma::Float64 = 0.42
+    age_retire::Int64 = 46                                                       ##Setting Retirement Age
+    theta::Float64 = 0.11 #Tax Rate
+    gamma::Float64 = 0.42 #Weight on consumption
     sigma::Int64 = 2
     z_prod::Array{Float64,1} = [3.0, 0.5]
     birth_distribution::Array{Float64,1} = [.2037, .7963]
     markov::Array{Float64,2} = [0.9261 .0739;0.9811 0.0189] #Instantiating the asymmetric case
     alpha::Float64 = 0.36 #capital share
     delta::Float64 = 0.06 #Capital Depreciation
-    beta::Float64 = 0.97
-    N::Int64 = 66
+    beta::Float64 = 0.97 #Discounting
+    N::Int64 = 66 #Number of life Periods
     Assets::Array{Float64,1} = collect(range(0,length=3000,stop=25)) ##
     na::Int64 = length(Assets)
     nz::Int64 = length(z_prod)
@@ -33,8 +33,8 @@ using Plots, Parameters
        1.0430000,
        1.0363000,
        1.0200000,
-       1.0110000]
-    produc = age_ef * z_prod'
+       1.0110000] #Deterministic age efficiency profile
+    produc = age_ef * z_prod' ##Productivity at different life stages
     n::Float64 = .011
 
 
@@ -43,16 +43,16 @@ end
 
 
 mutable struct Results
-    pol_func:: Array{Float64,3}
-    val_func:: Array{Float64,3}
+    pol_func:: Array{Float64,3} ##Instantitate Policy Function,value function, labor function
+    val_func:: Array{Float64,3}   ##
     #asset_func:: Array{Float64,3}
     lab_func:: Array{Float64,3}
     # v_final::Array{Float64,3}
     age_j:: Int64
-    r:: Float64
-    w:: Float64
-    b:: Float64
-    F:: Array{Float64,3}
+    r:: Float64 #Interest rate
+    w:: Float64 #wages
+    b:: Float64 # social security payments
+    F:: Array{Float64,3} # Distribution over asset holdings, age, and productivity
     K:: Float64
     L:: Float64
 
@@ -61,7 +61,7 @@ mutable struct Results
 end
 
 
-function Initialize()
+function Initialize()  ##Instantiate initial values for relevant variables
     prim = Primitives()
     pol_func = zeros(prim.na,prim.nz,prim.N)
     val_func = zeros(prim.na,prim.nz,prim.N)
@@ -77,10 +77,10 @@ function Initialize()
     res = Results(pol_func,val_func, lab_func,age_j, r,w,b,F, K, L)
     prim, res
 end
-function labor(prim::Primitives,res::Results,age_index,a_index,ap_index,z_index)
+function labor(prim::Primitives,res::Results,age_index,a_index,ap_index,z_index)  ##Optimal Labor Supply function
     @unpack theta, gamma, produc,Assets = prim
     @unpack w,r = res
-    l = (gamma*(1-theta)*produc[age_index,z_index]*w-(1-gamma)*((1+r)*Assets[a_index]-Assets[ap_index]))/((1-theta)*w*produc[age_index, z_index])
+    l = (gamma*(1-theta)*produc[age_index,z_index]*w-(1-gamma)*((1+r)*Assets[a_index]-Assets[ap_index]))/((1-theta)*w*produc[age_index, z_index]) ##Optimal Endogenous labor supply
     if l < 0
         l = 0
     elseif l > 1
@@ -89,14 +89,14 @@ function labor(prim::Primitives,res::Results,age_index,a_index,ap_index,z_index)
     l
 end
 
-function utility(prim::Primitives, res::Results, c, l,age_index)
+function utility(prim::Primitives, res::Results, c, l,age_index)  ##Utility functions
     @unpack sigma, gamma = prim
     u = -Inf
-    if  age_index > 45
+    if  age_index > 45  ##Utility functions for retired population
         if c>0
             u = (c^((1-sigma) * gamma))/(1 - sigma)
         end
-    elseif age_index < 46
+    elseif age_index < 46 #Utility function for working population
         if c > 0
             u = (((c^gamma) * ((1 - l)^(1-gamma)))^(1-sigma))/(1 - sigma)
         end
@@ -107,12 +107,7 @@ end
 
 
 
-
-function productivity(z,j)  #######
-    return z*j
-end
-
-function Backinduct(prim::Primitives,res::Results)
+function Backinduct(prim::Primitives,res::Results)  #Function to iterate backwards over ages to determine labor supply, asset holdings, as a function of producitivity, and age and future period asset holding
     @unpack age_retire, theta, gamma, sigma, z_prod, birth_distribution = prim
     @unpack markov, alpha, delta, beta, N, Assets, na, nz, age_ef, produc = prim
     @unpack w, r, b = res
@@ -126,19 +121,19 @@ function Backinduct(prim::Primitives,res::Results)
     for age_index = 66:-1:1
         println("Age: ", age_index)
         #if age_index == 66
-        for a_index = 1:na, z_index=1:nz
+        for a_index = 1:na, z_index=1:nz #Iterate over potential asset holdings
 
             #for a_index = 1:na, z_index=1:nz
-            if age_index == 66
-                res.val_func[a_index,z_index, age_index] = -Inf
-                budget = (1+r)*Assets[a_index] + b
+            if age_index == 66   ##The problem for those in the last period of life
+                res.val_func[a_index,z_index, age_index] = -Inf #Set a very low initial guess for value function
+                budget = (1+r)*Assets[a_index] + b #
                 c = budget
                 l = 0
-                val = utility(prim, res,c,l,age_index)
+                val = utility(prim, res,c,l,age_index) #Our value function in the last period of life involves no saving
                 #val =  (c^((1-sigma)*gamma))/(1-sigma)
-                if val > res.val_func[a_index,z_index, age_index]
-                    res.val_func[a_index,z_index,age_index] = val
-                    res.pol_func[a_index,:,age_index] .= zero(UInt32)
+                if val > res.val_func[a_index,z_index, age_index]   ##Check if our value function is greater than initital guess
+                    res.val_func[a_index,z_index,age_index] = val #update value of this value function
+                    res.pol_func[a_index,:,age_index] .= zero(UInt32) #We set both labor and saving to zero in this period
                     res.lab_func[a_index,:,age_index] .= zero(UInt32)
                      #I am addi
                     ##Add the value function over all asset levels for those in the final period of life.
@@ -147,19 +142,19 @@ function Backinduct(prim::Primitives,res::Results)
 
 
 
-            elseif age_index >= 46 && age_index < 66
-                res.val_func[a_index,z_index, age_index] = -Inf
+            elseif age_index >= 46 && age_index < 66  ##The problem for retired agents
+                res.val_func[a_index,z_index, age_index] = -Inf #Initial value function
                 l = 0
             #for a_index = 1:na, z_index = 1:nz
                 budget = (1+r)*Assets[a_index] + b
-                for ap_index = 1:na, zp_index = 1:nz
+                for ap_index = 1:na, zp_index = 1:nz  ##We now care about saving. Include state just for consistency
                     c = budget - Assets[ap_index]
 
                     val =utility(prim, res,c,l,age_index)+ beta*res.val_func[ap_index,zp_index,age_index+1]
-                    if val > res.val_func[a_index,z_index,age_index]
-                        res.val_func[a_index,z_index, age_index] = val
-                        res.pol_func[a_index,:, age_index] .= Assets[ap_index]
-                        res.lab_func[a_index,:, age_index] .= zero(UInt32)
+                    if val > res.val_func[a_index,z_index,age_index]   ##Conduct the same progressions as above. Updating the value function if a level of saving produces higher continuation value than the previous
+                        res.val_func[a_index,z_index, age_index] = val ##level of saving
+                        res.pol_func[a_index,:, age_index] .= Assets[ap_index]  ##we update our saving function
+                        res.lab_func[a_index,:, age_index] .= zero(UInt32) #We dont work
                          ##Add the value function over all asset levels for those in the final period of life.
                     end
 
@@ -167,19 +162,19 @@ function Backinduct(prim::Primitives,res::Results)
                 # res.val_func[:,:,age_index] .= val
                 # res.v_final[:,:,age_index] .= val
         #else age_index < 46
-            else age_index < 46
+    else age_index < 46  ##the problem for workers
                 res.val_func[a_index,z_index, age_index] = -Inf
             #for a_index = 1:na, z_index = 1:nz
                 for ap_index = 1:na
                     l = labor(prim,res,age_index,a_index,ap_index,z_index)
 
-                    budget = (1+r)*Assets[a_index] + w*(1-theta)*produc[age_index,z_index]*l
+                    budget = (1+r)*Assets[a_index] + w*(1-theta)*produc[age_index,z_index]*l  ##Our state is now very important
                     c = budget - Assets[ap_index]
-                    val = utility(prim, res,c,l,age_index) + beta*sum(res.val_func[ap_index,:,age_index+1].*markov[z_index,:])
-                    if val > res.val_func[a_index,z_index,age_index]
+                    val = utility(prim, res,c,l,age_index) + beta*sum(res.val_func[ap_index,:,age_index+1].*markov[z_index,:]) ##value function now heavily impacted by expectation over future productivity states
+                    if val > res.val_func[a_index,z_index,age_index] #Same progression as before
                         res.val_func[a_index,z_index, age_index] = val
-                        res.pol_func[a_index,z_index,age_index] = Assets[ap_index]
-                        res.lab_func[a_index,z_index,age_index] = l
+                        res.pol_func[a_index,z_index,age_index] = Assets[ap_index] #Update our saving
+                        res.lab_func[a_index,z_index,age_index] = l ##Now we have to set our
                         ##Add the value function over all asset levels for those in the final period of life.
                     end
                 end
@@ -211,8 +206,8 @@ function Fdist_sum(prim::Primitives,res::Results)
     end
     pop_sum = sum(pop_weights)
     pop_normal = pop_weights/pop_sum
-    F[1,1,1] = .2037/pop_sum
-    F[1,2,1] = .7963/pop_sum
+    F[1,1,1] = .2037
+    F[1,2,1] = .7963
     # s=-Inf
     # s_0 = -Inf
     # for j=1:66
@@ -223,22 +218,37 @@ function Fdist_sum(prim::Primitives,res::Results)
     #     s_0
     # end
     # s_0
+    for age_index = 1:65
+      for a_index = 1:na, z_index = 1:nz
+          if F[a_index, z_index, age_index] > 0
+              ap = res.pol_func[a_index, z_index,age_index]
+              ap_index = argmin(abs.(ap.-Assets))
+              for zp_index= 1:nz
+                  F[ap_index,zp_index,age_index + 1 ] += markov[z_index, zp_index]*F[a_index, z_index, age_index]
+
+              end
+         end
+     end
+ end
+ for a_index= 1:3000,z_index = 1:nz
+     F[a_index,z_index,:] = F[a_index,z_index,:].*pop_normal
+ end
 
     return pop_weights,pop_sum,pop_normal, F
 end
 pop_weights,pop_sum,pop_normal,res.F = Fdist_sum(prim,res)
 
 
-s = dist_sum()
-function distribution(res::Results)
-    s=-Inf
-    @unpack F = res
-    s = dist_sum()
-    F[1,1,1] = .2037/s
-    #F[1,2,1] = .7963/s
-
-
-end
-
-res.F[1,1,1] = .2037/dist_sum()
- distribution(res)
+# s = dist_sum()
+# function distribution(res::Results)
+#     s=-Inf
+#     @unpack F = res
+#     s = dist_sum()
+#     F[1,1,1] = .2037/s
+#     #F[1,2,1] = .7963/s
+#
+#
+# end
+#
+# res.F[1,1,1] = .2037/dist_sum()
+#  distribution(res)
