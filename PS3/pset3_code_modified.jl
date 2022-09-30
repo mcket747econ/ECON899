@@ -192,8 +192,14 @@ prim, res = Initialize()
 Backinduct(prim,res)
 
 plot(prim.Assets, res.val_func[:, 1, 50], title="Value Function at age 50", labels = "", legend=:topleft)
-plot(prim.Assets, [res.pol_func[:, 1, 20] res.pol_func[:, 2, 20]], title="Policy Function at age 20", labels = "", legend=:topleft)
-plot(prim.Assets, [res.pol_func[:, 1, 20].-prim.Assets res.pol_func[:, 2, 20].-prim.Assets], title="Saving Functions at age 20", labels = ["High" "Low"], legend=:topright)
+Plots.savefig("C:/Users/mcket/OneDrive/Documents/Fall 2022/ECON899-Computational/899Code/899/ECON899/PS3/PS_03_valfunc_50.png")
+plot(prim.Assets, [res.pol_func[:, 1, 20] res.pol_func[:, 2, 20]], title="Policy Function at age 20", labels = ["High Productivity State" "Low Productivity State"], legend=:topleft)
+plot(prim.Assets, [res.pol_func[:, 1, 20].-prim.Assets res.pol_func[:, 2, 20].-prim.Assets], title="Saving Functions at age 20", labels = ["High Productivity State" "Low Productivity State"], legend=:topright)
+Plots.savefig("C:/Users/mcket/OneDrive/Documents/Fall 2022/ECON899-Computational/899Code/899/ECON899/PS3/PS_03_savefunc_20.png")
+plot(prim.Assets, res.F[:, :, 2], title="Distribution of Assets at Age 2(21)", labels = ["High Productivity State" "Low Productivity State"], legend=:topleft)
+Plots.savefig("C:/Users/mcket/OneDrive/Documents/Fall 2022/ECON899-Computational/899Code/899/ECON899/PS3/PS_03_fdist_1.png")
+plot(prim.Assets, res.F[:, :, 50], title="Distribution of Assets at Age 50(70)", labels = ["High Productivity State" "Low Productivity State"], legend=:topleft)
+Plots.savefig("C:/Users/mcket/OneDrive/Documents/Fall 2022/ECON899-Computational/899Code/899/ECON899/PS3/PS_03_fdist_50.png")
 
 
 function Fdist_sum(prim::Primitives,res::Results)  ##Function to calculate distribution
