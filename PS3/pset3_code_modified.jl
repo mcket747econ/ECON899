@@ -196,17 +196,17 @@ plot(prim.Assets, [res.pol_func[:, 1, 20] res.pol_func[:, 2, 20]], title="Policy
 plot(prim.Assets, [res.pol_func[:, 1, 20].-prim.Assets res.pol_func[:, 2, 20].-prim.Assets], title="Saving Functions at age 20", labels = ["High" "Low"], legend=:topright)
 
 
-function Fdist_sum(prim::Primitives,res::Results)
-    @unpack N,n,nz=prim
+function Fdist_sum(prim::Primitives,res::Results)  ##Function to calculate distribution
+    @unpack N,n,nz,na, Assets, markov=prim
     @unpack F = res
-    pop_weights = ones(66)
-    mu = zeros(N,nz)
+    pop_weights = ones(66)#Initial weights
+    #mu = zeros(N,nz)
     for j=1:N-1
         pop_weights[j+1] = pop_weights[j]/(n+1)
-    end
+    end  ##Instantiate relative population sizes
     pop_sum = sum(pop_weights)
-    pop_normal = pop_weights/pop_sum
-    F[1,1,1] = .2037
+    pop_normal = pop_weights/pop_sum #Normalize the population
+    F[1,1,1] = .2037 #weights of population with initital productivities
     F[1,2,1] = .7963
     # s=-Inf
     # s_0 = -Inf
@@ -218,19 +218,19 @@ function Fdist_sum(prim::Primitives,res::Results)
     #     s_0
     # end
     # s_0
-    for age_index = 1:65
-      for a_index = 1:na, z_index = 1:nz
-          if F[a_index, z_index, age_index] > 0
-              ap = res.pol_func[a_index, z_index,age_index]
-              ap_index = argmin(abs.(ap.-Assets))
+    for age_index = 1:65  #for all ages
+      for a_index = 1:na, z_index = 1:nz #Over all asset levels and productivity levels
+          if F[a_index, z_index, age_index] > 0 #If there is a nonzero measure of the population with a given asset and productivity level
+              ap = res.pol_func[a_index, z_index,age_index] #Find the policy function prescription for savings given a persons age, holdings and state
+              ap_index = argmin(abs.(ap.-Assets)) #find the assets prescribed by policy function on the asset grid
               for zp_index= 1:nz
-                  F[ap_index,zp_index,age_index + 1 ] += markov[z_index, zp_index]*F[a_index, z_index, age_index]
-
+                  F[ap_index,zp_index,age_index + 1 ] += markov[z_index, zp_index]*F[a_index, z_index, age_index] ##Given the measure of the population with a given level of assets, productivity and age
+                  #find the measure of the population that will end up with the prescribed policy function level of assets in the next year of life by weighting by the markov matrix
               end
          end
      end
  end
- for a_index= 1:3000,z_index = 1:nz
+ for a_index= 1:3000,z_index = 1:nz  ###Multiply each measure of the distribution by the normalized population weights
      F[a_index,z_index,:] = F[a_index,z_index,:].*pop_normal
  end
 
