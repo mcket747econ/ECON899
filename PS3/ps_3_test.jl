@@ -73,8 +73,8 @@ function Initialize()
     w = 1.05
     b = 0.2
     F = zeros(prim.na,prim.nz,prim.N)
-    K = 3
-    L = 0.5
+    K = 3.3
+    L = 0.3
     K1 = 0 #doesn't really matter, get filled in later 
     L1 = 0  #doesn't really matter, gets filled in later
     K_new = zeros(prim.na,prim.nz,prim.N)
@@ -242,53 +242,64 @@ end
 
 
  ###############Question 3
-function MarketClearing(prim::Primitives, res::Results, pop_normal)
+function MarketClearing(prim::Primitives, res::Results)
     @unpack N, na, nz, alpha, age_retire, Assets, produc, theta = prim
     @unpack K1, L1, L, K, r, w, b, lab_func, F, K_new, L_new = res 
     for j in 1:N #Probably a way to do this better, but I'll need to see the outputs first, should be N but it didn't like that for some reason 
         for m in 1:na
             for z in 1:2
-                 K_new[m,z,j] = F[m,z,j]*Assets[m] #F is a placeholder here for whatever we get out of the stat dist 
+                 res.K_new[m,z,j] = F[m,z,j]*Assets[m] #F is a placeholder here for whatever we get out of the stat dist 
                 if j < age_retire
-                    L_new[m,z,j] = F[m,z,j]*produc[j,z]*lab_func[m,z,j] #I made some assumptions on which things I was supposed to pulle  
+                    res.L_new[m,z,j] = F[m,z,j]*produc[j,z]*lab_func[m,z,j] #I made some assumptions on which things I was supposed to pulle  
                 else
                     continue #does Julia need this? 
                 end
             end
         end
     end
-        K1 = sum(K_new)
-        L1 = sum(L_new)
-        r = (alpha*L1^(1-alpha))/K1^(1-alpha)
-        w = ((1-alpha)*K1^(alpha))/L1^(alpha)
-        retired_mass = sum(pop_normal[age_retire:N])
-        #for j in age_retired:N #or can do a sum across those numbers in mu, I'm not sure how this will be stored from stat distribution function
-         #   retired_mass += (1/1.011)^j 
-        #end
-        #retired_mass = sum(mu(age_retired:N,:,:)) #sum alternative once I know how mass is stored    
-        b = (theta*w*L1)/retired_mass
-    return res.K1, res.L1, res.r, res.w, res.b 
+        res.K1 = sum(K_new)
+        res.L1 = sum(L_new)
+    return res.K1, res.L1
 end
 
-function KL_update(res::Results, lam::Float64 = .01) #Marking part of the loop a function 
-    @unpack K1, L1, K, L = res        
-    K = lam*K1+(1-lam)*K 
-    L = lam*L1+(1-lam)*L
-    return res.K, res.L
+function KL_update(prim::Primitives,res::Results, pop_normal, lam::Float64 = .01) #Marking part of the loop a function 
+    @unpack alpha, theta, age_retire, N = prim 
+    @unpack K1, L1, K, L, w, r, b = res        
+    res.K = lam*K1+(1-lam)*K 
+    res.L = lam*L1+(1-lam)*L
+    res.r = (alpha*(L^(1-alpha)))/(K^(1-alpha))
+    res.w = ((1-alpha)*(K^(alpha)))/(L^(alpha))
+    retired_mass = sum(pop_normal[age_retire:N])
+    #for j in age_retired:N #or can do a sum across those numbers in mu, I'm not sure how this will be stored from stat distribution function
+     #   retired_mass += (1/1.011)^j 
+    #end
+    #retired_mass = sum(mu(age_retired:N,:,:)) #sum alternative once I know how mass is stored    
+    res.b = (theta*w*L)/retired_mass
+    return res.K, res.L, res.r, res.w, res.b
 end 
 
-function Run_all(prim::Primitives,res::Results, tol::Float64 = 1e-3)
+
+
+function Run_all(prim::Primitives,res::Results, tol::Float64 = 1e-3, lam::Float64 = .01)
+    res.r = (prim.alpha*(res.L^(1-prim.alpha)))/(res.K^(1-prim.alpha))
+    res.w = ((1-prim.alpha)*(res.K^(prim.alpha)))/(res.L^(prim.alpha))
+    retired_mass = 0
+    for j in prim.age_retire:prim.N #or can do a sum across those numbers in mu, I'm not sure how this will be stored from stat distribution function
+        retired_mass += (1/1.011)^j 
+    end
+    #retired_mass = sum(mu(age_retired:N,:,:)) #sum alternative once I know how mass is stored    
+    res.b = (prim.theta*res.w*res.L)/retired_mass
     stop = 0
     count = 1
-    while stop == 0
-        print("iteration: ", count)
+    while  count <= 100 && stop == 0
+        print("iteration: ", count, "     ")
         Backinduct(prim,res)
         pop_Weights, pop_sum, pop_normal, res.F = Fdist_sum(prim,res) ##rename with the appropriate function
-        K1, L1, r, w, b = MarketClearing(prim,res, pop_normal)
-        if (abs(K1-res.K) + abs(L1-res.L)) > tol && (abs(K1-res.K) + abs(L1-res.L)) < 50 #added a kill switch for non convergence
-            KL_update(res,.3) #can adjust as needed, .01 is what the prompt says but supposedly we can go fast
+        K1, L1 = MarketClearing(prim,res)
+        if (abs(K1-res.K) + abs(L1-res.L)) > tol
+            print((abs(K1-res.K) + abs(L1-res.L)), "       ")
+            K, L, r, w, b = KL_update(prim, res, pop_normal, lam) #can adjust as needed, .01 is what the prompt says but supposedly we can go fast
             count += 1
-            print((abs(K1-res.K) + abs(L1-res.L)))
         else
             stop = 1
         end 
@@ -297,4 +308,4 @@ end
 
 ###The real test
 prim, res = Initialize()
-@time Run_all(prim,res)
+@time Run_all(prim,res, 1e-1, .12)
