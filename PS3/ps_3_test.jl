@@ -12,7 +12,7 @@ using Plots, Parameters
     delta::Float64 = 0.06 #Capital Depreciation
     beta::Float64 = 0.97
     N::Int64 = 66
-    Assets::Array{Float64,1} = collect(range(0,length=250,stop=50)) ##made it shorter for now while bug testing
+    Assets::Array{Float64,1} = collect(range(0,length=500,stop=18.75)) ##made it shorter for now while bug testing, each step in .0375
     na::Int64 = length(Assets)
     nz::Int64 = length(z_prod)
     age_ef::Array{Float64,1} = [0.59923239,0.63885106, .67846973,
@@ -86,7 +86,7 @@ end
 function labor(prim::Primitives,res::Results,age_index,a_index,ap_index,z_index)  ##Optimal Labor Supply function
     @unpack theta, gamma, produc,Assets = prim
     @unpack w,r = res
-    l = (gamma*(1-theta)*produc[age_index,z_index]*w-(1-gamma)*((1+r)*Assets[a_index]-Assets[ap_index]))/((1-theta)*w*produc[age_index, z_index]) ##Optimal Endogenous labor supply
+    l = (gamma*(1-theta)*produc[age_index,z_index]*w-(1-gamma)*((1+r)*Assets[a_index]-Assets[ap_index]))/((1-theta)*w*produc[age_index, z_index]) ##Optimal Endogenous labor supply, including depreciation 
     if l < 0
         l = 0
     elseif l > 1
@@ -196,12 +196,15 @@ end
 #res.v_final= zeros(prim.na,prim.nz,prim.N)
 #@time Backinduct(prim,res)
 
+##Note, make sure to run Backinduct with the non-endogenous L,K,r,w,b for the plots and question 1
+
 
  ####################################Question 2
  function Fdist_sum(prim::Primitives,res::Results)  ##Function to calculate distribution
     @unpack N,n,nz,na, Assets, markov=prim
     @unpack F = res
-    pop_weights = ones(66)#Initial weights
+    F = zeros(na,nz,N) #reinitialization each loops fixes weird distribution being too big problem
+    pop_weights = ones(66) #Initial weights
     #mu = zeros(N,nz)
     for j=1:N-1
         pop_weights[j+1] = pop_weights[j]/(n+1)
@@ -242,7 +245,7 @@ end
 
 
  ###############Question 3
-function MarketClearing(prim::Primitives, res::Results)
+function MarketClearing(prim::Primitives, res::Results) #check these, might be overcounting something? 
     @unpack N, na, nz, alpha, age_retire, Assets, produc, theta = prim
     @unpack K1, L1, L, K, r, w, b, lab_func, F, K_new, L_new = res 
     for j in 1:N #Probably a way to do this better, but I'll need to see the outputs first, should be N but it didn't like that for some reason 
@@ -263,11 +266,11 @@ function MarketClearing(prim::Primitives, res::Results)
 end
 
 function KL_update(prim::Primitives,res::Results, pop_normal, lam::Float64 = .01) #Marking part of the loop a function 
-    @unpack alpha, theta, age_retire, N = prim 
+    @unpack alpha, theta, age_retire, N, delta = prim 
     @unpack K1, L1, K, L, w, r, b = res        
     res.K = lam*K1+(1-lam)*K 
     res.L = lam*L1+(1-lam)*L
-    res.r = (alpha*(L^(1-alpha)))/(K^(1-alpha))
+    res.r = (alpha*(L^(1-alpha)))/(K^(1-alpha)) - delta 
     res.w = ((1-alpha)*(K^(alpha)))/(L^(alpha))
     retired_mass = sum(pop_normal[age_retire:N])
     #for j in age_retired:N #or can do a sum across those numbers in mu, I'm not sure how this will be stored from stat distribution function
@@ -281,13 +284,12 @@ end
 
 
 function Run_all(prim::Primitives,res::Results, tol::Float64 = 1e-3, lam::Float64 = .01)
-    res.r = (prim.alpha*(res.L^(1-prim.alpha)))/(res.K^(1-prim.alpha))
+    res.r = (prim.alpha*(res.L^(1-prim.alpha)))/(res.K^(1-prim.alpha)) - prim.delta 
     res.w = ((1-prim.alpha)*(res.K^(prim.alpha)))/(res.L^(prim.alpha))
     retired_mass = 0
-    for j in prim.age_retire:prim.N #or can do a sum across those numbers in mu, I'm not sure how this will be stored from stat distribution function
+    for j in prim.age_retire:prim.N 
         retired_mass += (1/1.011)^j 
     end
-    #retired_mass = sum(mu(age_retired:N,:,:)) #sum alternative once I know how mass is stored    
     res.b = (prim.theta*res.w*res.L)/retired_mass
     stop = 0
     count = 1
