@@ -1,5 +1,6 @@
 #Problem Set 3 Code
-using Plots, Parameters
+
+using Plots, Parameters, Accessors
 @with_kw struct Primitives
     age_retire::Int64 = 46
     theta::Float64 = 0.11
@@ -12,7 +13,7 @@ using Plots, Parameters
     delta::Float64 = 0.06 #Capital Depreciation
     beta::Float64 = 0.97
     N::Int64 = 66
-    Assets::Array{Float64,1} = collect(range(0,length=500,stop=18.75)) ##made it shorter for now while bug testing, each step in .0375
+    Assets::Array{Float64,1} = collect(range(0,length=1000,stop=30)) ##made it shorter for now while bug testing, each step in .0375
     na::Int64 = length(Assets)
     nz::Int64 = length(z_prod)
     age_ef::Array{Float64,1} = [0.59923239,0.63885106, .67846973,
@@ -196,11 +197,22 @@ function Backinduct(prim::Primitives,res::Results)  #Function to iterate backwar
 end
 
 
-#prim, res = Initialize()
-#res.v_final= zeros(prim.na,prim.nz,prim.N)
-#@time Backinduct(prim,res)
+
+## graphs for question 1 
+prim, res = Initialize()
+res.v_final= zeros(prim.na,prim.nz,prim.N)
+@time Backinduct(prim,res)
 
 ##Note, make sure to run Backinduct with the non-endogenous L,K,r,w,b for the plots and question 1
+plot(prim.Assets, res.val_func[:, 1, 50], title="Value Function at age 50", labels = "", legend=:topleft)
+Plots.savefig("C:/Users/mcket/OneDrive/Documents/Fall 2022/ECON899-Computational/899Code/899/ECON899/PS3/PS_03_valfunc_50.png")
+plot(prim.Assets, [res.pol_func[:, 1, 20] res.pol_func[:, 2, 20]], title="Policy Function at age 20", labels = ["High Productivity State" "Low Productivity State"], legend=:topleft)
+plot(prim.Assets, [res.pol_func[:, 1, 20].-prim.Assets res.pol_func[:, 2, 20].-prim.Assets], title="Saving Functions at age 20", labels = ["High Productivity State" "Low Productivity State"], legend=:topright)
+Plots.savefig("C:/Users/mcket/OneDrive/Documents/Fall 2022/ECON899-Computational/899Code/899/ECON899/PS3/PS_03_savefunc_20.png")
+plot(prim.Assets, res.F[:, :, 2], title="Distribution of Assets at Age 2(21)", labels = ["High Productivity State" "Low Productivity State"], legend=:topleft)
+Plots.savefig("C:/Users/mcket/OneDrive/Documents/Fall 2022/ECON899-Computational/899Code/899/ECON899/PS3/PS_03_fdist_1.png")
+plot(prim.Assets, res.F[:, :, 50], title="Distribution of Assets at Age 50(70)", labels = ["High Productivity State" "Low Productivity State"], legend=:topleft)
+Plots.savefig("C:/Users/mcket/OneDrive/Documents/Fall 2022/ECON899-Computational/899Code/899/ECON899/PS3/PS_03_fdist_50.png")
 
 
  ####################################Question 2
@@ -272,7 +284,7 @@ end
 function KL_update(prim::Primitives,res::Results, pop_normal, lam::Float64 = .01) #Marking part of the loop a function
     @unpack alpha, theta, age_retire, N, delta = prim
     @unpack K1, L1, K, L, w, r, b = res
-    res.K = lam*K1+(1-lam) *K
+    res.K = lam*K1+(1-lam)*K
     res.L = lam*L1+(1-lam)*L
     res.r = (alpha*(L^(1-alpha)))/(K^(1-alpha)) - delta
     res.w = ((1-alpha)*(K^(alpha)))/(L^(alpha))
@@ -333,7 +345,7 @@ function Run_all(prim::Primitives,res::Results, tol::Float64 = 1e-3, lam::Float6
         end
     end
     welfare_fctn(prim,res) #get aggregate welfare
-    print("Finished in ",count," iterations")
+    println("Finished in ",count," iterations")
     println("Capital: ", res.K)
     println("Labor: ", res.L)
     println("Rent: ", res.r)
@@ -344,6 +356,46 @@ function Run_all(prim::Primitives,res::Results, tol::Float64 = 1e-3, lam::Float6
 end
 
 ###The real test
+#prim, res = Initialize()
+#pop_weights,pop_sum,pop_normal, F =  Fdist_sum(prim,res)
+
+## Experiment 1
+
+println("Experiment 1")
 prim, res = Initialize()
-pop_weights,pop_sum,pop_normal, F =  Fdist_sum(prim,res)
-@time Run_all(prim,res, 1e-1, .12)
+@time Run_all(prim,res, 1e-3, .3)
+
+
+## Experiment 2, theta = 0
+println("Experiment 2")
+prim, res = Initialize()
+prim_2 = @set prim.theta = 0
+@time Run_all(prim_2,res, 1e-3, .3)
+
+## Experiment 3, no risk
+println("Experiment 3")
+prim, res = Initialize()
+prim_3 = @set prim.z_prod = [.5, .5]
+prim_3 = @set prim_3.produc = prim_3.age_ef * prim_3.z_prod'
+@time Run_all(prim_3,res, 1e-3, .3)
+
+## Experiment 4, no risk theta = 0
+println("Experiment 4")
+prim, res = Initialize()
+prim_4 = @set prim.theta = 0
+prim_4 = @set prim_4.z_prod = [.5, .5]
+prim_4 = @set prim_4.produc = prim_4.age_ef * prim_4.z_prod'
+@time Run_all(prim_4,res, 1e-3, .3)
+
+## Experiment 5, exogenous labor 
+println("Experiment 5")
+prim, res = Initialize()
+prim_5 = @set prim.gamma = 1
+@time Run_all(prim_5,res, 1e-3, .3)
+
+## Experiment 6, exogenous labor, theta = 0
+println("Experiment 6")
+prim, res = Initialize()
+prim_6 = @set prim.gamma = 1
+prim_6 = @set prim_6.theta = 0
+@time Run_all(prim_6,res, 1e-3, .3)
