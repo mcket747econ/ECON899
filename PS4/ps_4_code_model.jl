@@ -1,7 +1,7 @@
 
 #Problem Set 3 Code
 
-using Plots, Parameters, Setfield
+using Plots, Parameters
 @with_kw struct Primitives
     age_retire::Int64 = 46
     theta::Float64 = 0.11
@@ -14,7 +14,7 @@ using Plots, Parameters, Setfield
     delta::Float64 = 0.06 #Capital Depreciation
     beta::Float64 = 0.97
     N::Int64 = 66
-    Assets::Array{Float64,1} = collect(range(0,length=250,stop=30)) ##made it shorter for now while bug testing, each step in .0375
+    Assets::Array{Float64,1} = collect(range(0,length=1000,stop=30)) ##made it shorter for now while bug testing, each step in .0375
     na::Int64 = length(Assets)
     nz::Int64 = length(z_prod)
     age_ef::Array{Float64,1} = [0.59923239,0.63885106, .67846973,
@@ -38,9 +38,6 @@ using Plots, Parameters, Setfield
        1.0110000]
     produc = age_ef * z_prod' ##Productivity at different life stages
     n::Float64 = .011
-    T::Int64 = 30
-    t_Array::Array{Float64,1} = collect(range(0,length=30,stop=30))                                                                 #Guessing a certain amount of time for transition
-                                                             ##Setting the amount of time for transition
 ##Make a matrix
 
 end
@@ -67,8 +64,6 @@ mutable struct Results
     L_new:: Array{Float64,3}
     welf:: Float64
     CV:: Float64
-
-    #T_delta::Float64 = (K_n - K_0 )/T   #Transitiondelta
 end
 
 function Initialize()
@@ -86,12 +81,10 @@ function Initialize()
     L = 0.3
     K1 = 0 #doesn't really matter, get filled in later
     L1 = 0  #doesn't really matter, gets filled in later
-    T = 30  ##Initital guess for the amount of time for transition to take place
     K_new = zeros(prim.na,prim.nz,prim.N)
     L_new = zeros(prim.na,prim.nz,prim.age_retire-1)
     welf = 0.0
     CV = 0.0
-    K_t =
     res = Results(pol_func,val_func, lab_func,age_j, r,w,b,F, K, L, K1, L1, K_new, L_new, welf, CV)
     prim, res
 end
@@ -208,7 +201,7 @@ end
 
 ## graphs for question 1
 prim, res = Initialize()
-# res.v_final= zeros(prim.na,prim.nz,prim.N)
+res.v_final= zeros(prim.na,prim.nz,prim.N)
 @time Backinduct(prim,res)
 
 ##Note, make sure to run Backinduct with the non-endogenous L,K,r,w,b for the plots and question 1
@@ -329,7 +322,7 @@ end
 
 
 ################
-function Run_all(prim::Primitives,res::Results, tol::Float64 = .01, lam::Float64 = .01, kill::Int64 = 250)
+function Run_all(prim::Primitives,res::Results, tol::Float64 = 1e-3, lam::Float64 = .01, kill::Int64 = 1000)
     res.r = (prim.alpha*(res.L^(1-prim.alpha)))/(res.K^(1-prim.alpha)) - prim.delta
     res.w = ((1-prim.alpha)*(res.K^(prim.alpha)))/(res.L^(prim.alpha))
     retired_mass = 0
@@ -360,9 +353,7 @@ function Run_all(prim::Primitives,res::Results, tol::Float64 = .01, lam::Float64
     println("wages: ", res.w)
     println("b: ", res.b)
     println("Welfare: ", res.welf)
-    println("CV: ", res.CV)
-
-    return res.val_func, res.K, res.L, res.r, res.w, res.b, res.F
+    println("CV: ", res. CV)
 end
 
 ###The real test
@@ -370,45 +361,81 @@ end
 #pop_weights,pop_sum,pop_normal, F =  Fdist_sum(prim,res)
 
 ## Experiment 1
-# function statdistSS(prim::Primitives, res::Results)
-#     println("Experiment 1")
-#     prim, res = Initialize()
-#     elapse = @elapsed val_func_0, K_0, L_0, r_0, w_0, b_0 = Run_all(prim,res, 1e-3, .3)
-#     return val_func_0, K_0, L_0, r_0, w_0, b_0
-# end
-# val_func_0, K_0, L_0, r_0, w_0, b_0 = statdistSS(prim,res)
-# function statdistNSS(prim::Primitives, res::Results)
-#     println("Experiment 2")
-#     prim, res = Initialize()
-#     prim_2 = @set prim.theta = 0
-#     elapse = @elapsed val_func_n, K_n, L_n, r_n, w_n, b_n = Run_all(prim_2,res, 1e-3, .3)
-#     return val_func_n, K_n, L_n, r_n, w_n, b_n
-# end
 
-# Experiment 3, no risk
-# println("Experiment 3")
-# prim, res = Initialize()
-# prim_3 = @set prim.z_prod = [.5, .5]
-# prim_3 = @set prim_3.produc = prim_3.age_ef * prim_3.z_prod'
-# @time Run_all(prim_3,res, 1e-3, .3)
+println("Experiment 1")
+prim, res = Initialize()
+@time Run_all(prim,res, 1e-3, .3)
 
-# ## Experiment 4, no risk theta = 0
-# println("Experiment 4")
-# prim, res = Initialize()
-# prim_4 = @set prim.theta = 0
-# prim_4 = @set prim_4.z_prod = [.5, .5]
-# prim_4 = @set prim_4.produc = prim_4.age_ef * prim_4.z_prod'
-# @time Run_all(prim_4,res, 1e-3, .3)
-#
-# ## Experiment 5, exogenous labor
-# println("Experiment 5")
-# prim, res = Initialize()
-# prim_5 = @set prim.gamma = 1
-# @time Run_all(prim_5,res, 1e-3, .3)
-#
-# ## Experiment 6, exogenous labor, theta = 0
-# println("Experiment 6")
-# prim, res = Initialize()
-# prim_6 = @set prim.gamma = 1
-# prim_6 = @set prim_6.theta = 0
-# @time Run_all(prim_6,res, 1e-3, .3)
+<<<<<<<
+
+## Experiment 2, theta = 0
+println("Experiment 2")
+prim, res = Initialize()
+prim_2 = @set prim.theta = 0
+@time Run_all(prim_2,res, 1e-3, .3)
+
+## Experiment 3, no risk
+println("Experiment 3")
+prim, res = Initialize()
+prim_3 = @set prim.z_prod = [.5, .5]
+prim_3 = @set prim_3.produc = prim_3.age_ef * prim_3.z_prod'
+@time Run_all(prim_3,res, 1e-3, .3)
+
+## Experiment 4, no risk theta = 0
+println("Experiment 4")
+prim, res = Initialize()
+prim_4 = @set prim.theta = 0
+prim_4 = @set prim_4.z_prod = [.5, .5]
+prim_4 = @set prim_4.produc = prim_4.age_ef * prim_4.z_prod'
+@time Run_all(prim_4,res, 1e-3, .3)
+
+## Experiment 5, exogenous labor
+println("Experiment 5")
+prim, res = Initialize()
+prim_5 = @set prim.gamma = 1
+@time Run_all(prim_5,res, 1e-3, .3)
+
+## Experiment 6, exogenous labor, theta = 0
+println("Experiment 6")
+prim, res = Initialize()
+prim_6 = @set prim.gamma = 1
+prim_6 = @set prim_6.theta = 0
+@time Run_all(prim_6,res, 1e-3, .3)
+
+=======
+
+## Experiment 2, theta = 0
+println("Experiment 2")
+prim, res = Initialize()
+prim_2 = @set prim.theta = 0
+@time Run_all(prim_2,res, 1e-3, .3)
+
+## Experiment 3, no risk
+println("Experiment 3")
+prim, res = Initialize()
+prim_3 = @set prim.z_prod = [.5, .5]
+prim_3 = @set prim_3.produc = prim_3.age_ef * prim_3.z_prod'
+@time Run_all(prim_3,res, 1e-3, .3)
+
+## Experiment 4, no risk theta = 0
+println("Experiment 4")
+prim, res = Initialize()
+prim_4 = @set prim.theta = 0
+prim_4 = @set prim_4.z_prod = [.5, .5]
+prim_4 = @set prim_4.produc = prim_4.age_ef * prim_4.z_prod'
+@time Run_all(prim_4,res, 1e-3, .3)
+
+## Experiment 5, exogenous labor
+println("Experiment 5")
+prim, res = Initialize()
+prim_5 = @set prim.gamma = 1
+@time Run_all(prim_5,res, 1e-3, .3)
+
+## Experiment 6, exogenous labor, theta = 0
+println("Experiment 6")
+prim, res = Initialize()
+prim_6 = @set prim.gamma = 1
+prim_6 = @set prim_6.theta = 0
+@time Run_all(prim_6,res, 1e-3, .3)
+
+>>>>>>>
