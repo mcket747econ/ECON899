@@ -45,9 +45,9 @@ function shoot_backward(prim::Primitives,res2)
     @unpack T_delta, K_t, L_t,T, l_delta = res2
     @unpack na,nz,N, Assets = prim
     val_func = zeros(na,nz,N)
-    k_now = 0
-    l_now = 0
-    for t in T-1:-1:1
+    k_now = K_n
+    l_now = L_n
+    for t in T:-1:1
 
         res2.K_t[t] = K_0 + t*T_delta
         res2.L_t[t] = L_0 + t*l_delta
