@@ -4,55 +4,88 @@ cd("C:/Users/mcket/OneDrive/Documents/Fall 2022/ECON899-Computational/899Code/89
 include("ps_4_code.jl")
 prim, res = Initialize()
 
-val_func_0, K_0, L_0, r_0, w_0, b_0, F_0 =  Run_all(prim,res, .01, .3)
+val_func_0,pol_func_0, K_0, L_0, r_0, w_0, b_0, F_0 =  Run_all(prim,res, .01, .3)
 prim_2 = @set prim.theta = 0
-val_func_n, K_n, L_n, r_n, w_n, b_n, F_n = Run_all(prim_2,res, .01, .3)
+val_func_n, pol_func_n, K_n, L_n, r_n, w_n, b_n, F_n = Run_all(prim_2,res, .01, .3)
 
 
 mutable struct new_primitives
     T_delta::Float64
+    l_delta::Float64
     K_t::Array{Float64,1}
     L_t::Array{Float64,1}
-
-
-
-
-
-
-
-
+    # val_func_n::Array{Float64,1}
+    sav_func_t::Array{Float64,4}
+    val_func_t::Array{Float64,4}
+    lab_func_t::Array{Float64,4}
+    pol_func_t::Array{Float64,4}
+    T::Int64
 end
+
 
 function Initialize2()
+    T = 30
     T_delta = (K_n - K_0 )/prim.T
-    K_t[t] = K_0 + prim.t_Array[t]*delta
-    L_t::Array{Float64,1}
-    res2 = new_primitives(T_delta, K_t, L_t)
+    l_delta = (L_n - L_0)/prim.T
+    K_t = zeros(T)
+    L_t = zeros(T)
+    val_func_t = zeros(prim.na,prim.nz,prim.N,T)
+    sav_func_t = zeros(prim.na,prim.nz,prim.N,T)
+    lab_func_t = zeros(prim.na,prim.nz,prim.N,T)
+    pol_func_t = zeros(prim.na,prim.nz,prim.N,T)
 
-
-
-
-
+    res2 = new_primitives(T_delta,l_delta, K_t, L_t,sav_func_t,val_func_t,lab_func_t, pol_func_t,T)
+    res2
 
 
 end
-res2 = Initialize2
+res2 = Initialize2()
 
-function shoot_backward()
-    @unpack T_delta, K_t, L_t, res2 = res2
-    @unpack na = prim
+function shoot_backward(prim::Primitives,res2)
+    @unpack T_delta, K_t, L_t,T, l_delta = res2
+    @unpack na,nz,N, Assets = prim
+    val_func = zeros(na,nz,N)
+    k_now = 0
+    l_now = 0
     for t in T-1:-1:1
-        for a = 1:na
-            for z = 1:nz
-                res.K_t[t] = K_0 + t*T_delta
-                res.val_func[a,z,t] =  
+
+        res2.K_t[t] = K_0 + t*T_delta
+        res2.L_t[t] = L_0 + t*l_delta
+        k_now = res2.K_t[t]
+        l_now = res2.L_t[t]
+        pop_weights,pop_sum,pop_normal, F = Fdist_sum(prim,res)
+        res.r,res.w,res.b = KL_update2(prim,res, pop_normal,k_now,l_now, .5)
+        # val = res2.val_func_n[a,z,t]
+        res2.val_func_t[:,:,:,t],res2.pol_func_t[:,:,:,t],res2.lab_func_t[:,:,:,t] = Backinduct(prim,res)
+
+
+        # res2.val_func_t[:,:,:,t] = res2.val_func
+        # res2.pol_func_t[:,:,:,t] = res2.pol_func
+        # res2.lab_func_t[:,:,:,t] = res2.lab_func
+        res2.sav_func_t[:,:,:,t] = res2.pol_func_t[:,:,:,t] .- Assets
+
+
+    end
+    return res2.val_func_t, res2.pol_func_t, res2.lab_func_t, res2.K_t, res2.sav_func_t
+end
+res2.val_func_t, res2.pol_func_t, res2.lab_func_t, res2.K_t, res2.sav_func_t = shoot_backward(prim,res2)
 
 
 
-
-
-
-
+function KL_update2(prim::Primitives,res::Results, pop_normal,k,l, lam::Float64 = .01) #Marking part of the loop a function
+    @unpack alpha, theta, age_retire, N, delta = prim
+    @unpack K1, L1, K, L, w, r, b = res
+    res.K = k
+    res.L = l
+    res.r = (alpha*(L^(1-alpha)))/(K^(1-alpha)) - delta
+    res.w = ((1-alpha)*(K^(alpha)))/(L^(alpha))
+    retired_mass = sum(pop_normal[age_retire:N])
+    #for j in age_retired:N #or can do a sum across those numbers in mu, I'm not sure how this will be stored from stat distribution function
+     #   retired_mass += (1/1.011)^j
+    #end
+    #retired_mass = sum(mu(age_retired:N,:,:)) #sum alternative once I know how mass is stored
+    res.b = (theta*w*L)/retired_mass
+    return  res.r, res.w, res.b
 end
 
 
@@ -61,8 +94,6 @@ end
 
 
 
-
-end
 
 
 

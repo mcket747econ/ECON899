@@ -136,7 +136,7 @@ function Backinduct(prim::Primitives,res::Results)  #Function to iterate backwar
     # L = 0.3 #######
     # v_0=1e-10
     for age_index = 66:-1:1
-        #println("Age: ", age_index)
+        println("Age: ", age_index)
         #if age_index == 66
         for a_index = 1:na, z_index=1:nz #Iterate over potential asset holdings
 
@@ -362,7 +362,7 @@ function Run_all(prim::Primitives,res::Results, tol::Float64 = .01, lam::Float64
     println("Welfare: ", res.welf)
     println("CV: ", res.CV)
 
-    return res.val_func, res.K, res.L, res.r, res.w, res.b, res.F
+    return res.val_func, res.pol_func,res.K, res.L, res.r, res.w, res.b, res.F
 end
 
 ###The real test
