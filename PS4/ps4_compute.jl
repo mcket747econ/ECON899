@@ -21,11 +21,13 @@ mutable struct new_primitives
     pol_func_t::Array{Float64,4}
     F_t::Array{Float64,4}
     T::Int64
+    T_array::Array{Int64,1}
 end
 
 
 function Initialize2()
     T = 30
+    T_array = collect(range(1,length=30,stop=30))
     T_delta = (K_n - K_0 )/prim.T
     l_delta = (L_n - L_0)/prim.T
     K_t = zeros(T)
@@ -35,8 +37,7 @@ function Initialize2()
     lab_func_t = zeros(prim.na,prim.nz,prim.N,T)
     pol_func_t = zeros(prim.na,prim.nz,prim.N,T)
     F_t = zeros(prim.na,prim.nz,prim.N,T)
-
-    res2 = new_primitives(T_delta,l_delta, K_t, L_t,sav_func_t,val_func_t,lab_func_t, pol_func_t,F_t,T)
+    res2 = new_primitives(T_delta,l_delta, K_t, L_t,sav_func_t,val_func_t,lab_func_t, pol_func_t,F_t,T,T_array)
     res2
 
 
@@ -60,7 +61,7 @@ end
 
 
 function shoot_backward(prim::Primitives,res2)
-    @unpack T_delta, K_t, L_t,T, l_delta = res2
+    @unpack T_delta, K_t, L_t,T, l_delta,F_t = res2
     @unpack na,nz,N, Assets = prim
     val_func = zeros(na,nz,N)
     k_now = K_n
@@ -71,7 +72,7 @@ function shoot_backward(prim::Primitives,res2)
         res2.L_t[t] = L_0 + t*l_delta
         k_now = res2.K_t[t]
         l_now = res2.L_t[t]
-        pop_weights,pop_sum,pop_normal, F = Fdist_sum(prim,res)
+        pop_weights,pop_sum,pop_normal, F_t = Fdist_sum(prim,res)
         res.r,res.w,res.b = KL_update2(prim,res, pop_normal,k_now,l_now, .5)
         # val = res2.val_func_n[a,z,t]
         res2.val_func_t[:,:,:,t],res2.pol_func_t[:,:,:,t],res2.lab_func_t[:,:,:,t] = Backinduct(prim,res)
@@ -89,22 +90,26 @@ end
 res2.val_func_t, res2.pol_func_t, res2.lab_func_t, res2.K_t, res2.sav_func_t = shoot_backward(prim,res2)
 
 
-function shootforward(prim::Primitives,res2::new_primitives,res::Results)
-    @unpack na,nz = primitives
+function shootforward(prim::Primitives,res2::new_primitives,res::Results,F_0,F_n)
+    @unpack na,nz,markov,N,Assets = prim
     @unpack F = res
-    @unpack T = res2
-    for t in 1:T
-        for a in 1:na
-            pol_func = res2.pol_func_t[a,:,:,t]
-            for z in 1:nz
-                pol_func_z = pol_func[z]
-                F[:,:,:,t] = F
-
-
-
-
-
-
+    @unpack T, F_next= res2
+    F_next= zeros(na,nz,N,T)
+    F_next[:,:,:,0] = F_0
+    for t in 0:T-1
+        for age_index = 1:N
+            for a_index in 1:na
+                for z_index in 1:nz
+                    ap = res2.pol_func_t[a_index,z_index,age_index,t]
+                    ap_index = argmin(abs.(ap_index.-Assets))
+                    for zp_indez in 1:nz
+                        F_next[ap_index,zp_index,age_index,t+1] += markov[z_index,zp_index]*F_next[a_index,z_index,age_index,t]
+                    end
+                end
+            end
+        end
+    end
+    F_next
 
 end
 
@@ -123,8 +128,7 @@ end
 ###Now We Compute the Transition Path
 
 
-prim, res = Initialize()
-elapse =
+
 
 
 
