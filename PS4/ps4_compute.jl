@@ -19,6 +19,7 @@ mutable struct new_primitives
     val_func_t::Array{Float64,4}
     lab_func_t::Array{Float64,4}
     pol_func_t::Array{Float64,4}
+    F_t::Array{Float64,4}
     T::Int64
 end
 
@@ -33,13 +34,30 @@ function Initialize2()
     sav_func_t = zeros(prim.na,prim.nz,prim.N,T)
     lab_func_t = zeros(prim.na,prim.nz,prim.N,T)
     pol_func_t = zeros(prim.na,prim.nz,prim.N,T)
+    F_t = zeros(prim.na,prim.nz,prim.N,T)
 
-    res2 = new_primitives(T_delta,l_delta, K_t, L_t,sav_func_t,val_func_t,lab_func_t, pol_func_t,T)
+    res2 = new_primitives(T_delta,l_delta, K_t, L_t,sav_func_t,val_func_t,lab_func_t, pol_func_t,F_t,T)
     res2
 
 
 end
 res2 = Initialize2()
+function KL_update2(prim::Primitives,res::Results, pop_normal,k,l, lam::Float64 = .01) #Marking part of the loop a function
+    @unpack alpha, theta, age_retire, N, delta = prim
+    @unpack K1, L1, K, L, w, r, b = res
+    res.K = k
+    res.L = l
+    res.r = (alpha*(L^(1-alpha)))/(K^(1-alpha)) - delta
+    res.w = ((1-alpha)*(K^(alpha)))/(L^(alpha))
+    retired_mass = sum(pop_normal[age_retire:N])
+    #for j in age_retired:N #or can do a sum across those numbers in mu, I'm not sure how this will be stored from stat distribution function
+     #   retired_mass += (1/1.011)^j
+    #end
+    #retired_mass = sum(mu(age_retired:N,:,:)) #sum alternative once I know how mass is stored
+    res.b = (theta*w*L)/retired_mass
+    return  res.r, res.w, res.b
+end
+
 
 function shoot_backward(prim::Primitives,res2)
     @unpack T_delta, K_t, L_t,T, l_delta = res2
@@ -71,22 +89,25 @@ end
 res2.val_func_t, res2.pol_func_t, res2.lab_func_t, res2.K_t, res2.sav_func_t = shoot_backward(prim,res2)
 
 
+function shootforward(prim::Primitives,res2::new_primitives,res::Results)
+    @unpack na,nz = primitives
+    @unpack F = res
+    @unpack T = res2
+    for t in 1:T
+        for a in 1:na
+            pol_func = res2.pol_func_t[a,:,:,t]
+            for z in 1:nz
+                pol_func_z = pol_func[z]
+                F[:,:,:,t] = F
 
-function KL_update2(prim::Primitives,res::Results, pop_normal,k,l, lam::Float64 = .01) #Marking part of the loop a function
-    @unpack alpha, theta, age_retire, N, delta = prim
-    @unpack K1, L1, K, L, w, r, b = res
-    res.K = k
-    res.L = l
-    res.r = (alpha*(L^(1-alpha)))/(K^(1-alpha)) - delta
-    res.w = ((1-alpha)*(K^(alpha)))/(L^(alpha))
-    retired_mass = sum(pop_normal[age_retire:N])
-    #for j in age_retired:N #or can do a sum across those numbers in mu, I'm not sure how this will be stored from stat distribution function
-     #   retired_mass += (1/1.011)^j
-    #end
-    #retired_mass = sum(mu(age_retired:N,:,:)) #sum alternative once I know how mass is stored
-    res.b = (theta*w*L)/retired_mass
-    return  res.r, res.w, res.b
+
+
+
+
+
+
 end
+
 
 
 
@@ -142,7 +163,6 @@ elapse =
        1.0519200,
        1.0430000,
        1.0363000,
-       1.0200000,
        1.0110000]
     produc = age_ef * z_prod' ##Productivity at different life stages
     n::Float64 = .011
