@@ -13,6 +13,7 @@ mutable struct new_primitives
     T_delta::Float64
     l_delta::Float64
     K_t::Array{Float64,1}
+    K_potential::Array{Float64,1}
     L_t::Array{Float64,1}
     # val_func_n::Array{Float64,1}
     sav_func_t::Array{Float64,4}
@@ -31,13 +32,14 @@ function Initialize2()
     T_delta = (K_n - K_0 )/prim.T
     l_delta = (L_n - L_0)/prim.T
     K_t = zeros(T)
+    K_potential = zeros(T)
     L_t = zeros(T)
     val_func_t = zeros(prim.na,prim.nz,prim.N,T)
     sav_func_t = zeros(prim.na,prim.nz,prim.N,T)
     lab_func_t = zeros(prim.na,prim.nz,prim.N,T)
     pol_func_t = zeros(prim.na,prim.nz,prim.N,T)
     F_t = zeros(prim.na,prim.nz,prim.N,T)
-    res2 = new_primitives(T_delta,l_delta, K_t, L_t,sav_func_t,val_func_t,lab_func_t, pol_func_t,F_t,T,T_array)
+    res2 = new_primitives(T_delta,l_delta, K_t, K_potential, L_t,sav_func_t,val_func_t,lab_func_t, pol_func_t,F_t,T,T_array)
     res2
 
 
@@ -93,16 +95,17 @@ res2.val_func_t, res2.pol_func_t, res2.lab_func_t, res2.K_t, res2.sav_func_t = s
 function shootforward(prim::Primitives,res2::new_primitives,res::Results,F_0,F_n)
     @unpack na,nz,markov,N,Assets = prim
     @unpack F = res
-    @unpack T, F_next= res2
+    @unpack T = res2
     F_next= zeros(na,nz,N,T)
-    F_next[:,:,:,0] = F_0
-    for t in 0:T-1
+    F_next[:,:,:,1] = F_0
+    for t in 1:T-1
         for age_index = 1:N
             for a_index in 1:na
+                ap_index = 0
                 for z_index in 1:nz
                     ap = res2.pol_func_t[a_index,z_index,age_index,t]
-                    ap_index = argmin(abs.(ap_index.-Assets))
-                    for zp_indez in 1:nz
+                    ap_index = 1* argmin(abs.(ap_index.-Assets))
+                    for zp_index in 1:nz
                         F_next[ap_index,zp_index,age_index,t+1] += markov[z_index,zp_index]*F_next[a_index,z_index,age_index,t]
                     end
                 end
@@ -113,15 +116,30 @@ function shootforward(prim::Primitives,res2::new_primitives,res::Results,F_0,F_n
 
 end
 
+res2.F_t = shootforward(prim,res2,res,F_0,F_n)
 
 
+function new_equilibrium(prim::Primitives,res2::new_primitives,res::Results,K_0)
+    @unpack T,sav_func_t,F_t =res2
+    @unpack N, na, nz = prim
 
+   K_potential = zeros(T)
+   K_potential[1] = K_0
+   for t in 1:T-1
+        println("Were on Age: ",t)
+        for age_index in 1:N
+            for a_index in 1:na
+                for z_index in 1:nz
+                    K_potential[t+1] += sav_func_t[a_index,z_index,age_index,t]*F_t[a_index,z_index,age_index,t]
+                end
+            end
+        end
+    end
+    K_potential
 
+end
 
-
-
-
-
+res2.K_potential = new_equilibrium(prim,res2,res,K_0)
 
 
 
