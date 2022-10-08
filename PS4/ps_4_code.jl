@@ -1,7 +1,7 @@
 
 #Problem Set 3 Code
 
-using Plots, Parameters, Setfield
+using Plots, Parameters, SetFields
 @with_kw struct Primitives
     age_retire::Int64 = 46
     theta::Float64 = 0.11
@@ -36,7 +36,7 @@ using Plots, Parameters, Setfield
        1.0363000,
        1.0200000,
        1.0110000]
-    produc = age_ef * z_prod' ##Productivity at different life stages
+    produc::Array{Float64,2} = age_ef * z_prod' ##Productivity at different life stages
     n::Float64 = .011
     T::Int64 = 30
     t_Array::Array{Float64,1} = collect(range(0,length=30,stop=30))                                                                 #Guessing a certain amount of time for transition
@@ -99,7 +99,7 @@ end
 function labor(prim::Primitives,res::Results,age_index,a_index,ap_index,z_index)  ##Optimal Labor Supply function
     @unpack theta, gamma, produc,Assets = prim
     @unpack w,r = res
-    l = (gamma*(1-theta)*produc[age_index,z_index]*w-(1-gamma)*((1+r)*Assets[a_index]-Assets[ap_index]))/((1-theta)*w*produc[age_index, z_index]) ##Optimal Endogenous labor supply, including depreciation
+    l::Float64 = (gamma*(1-theta)*produc[age_index,z_index]*w-(1-gamma)*((1+r)*Assets[a_index]-Assets[ap_index]))/((1-theta)*w*produc[age_index, z_index]) ##Optimal Endogenous labor supply, including depreciation
     if l < 0
         l = 0
     elseif l > 1
@@ -110,7 +110,7 @@ end
 
 function utility(prim::Primitives, res::Results, c, l,age_index)  ##Utility functions
     @unpack sigma, gamma = prim
-    u = -Inf
+    u::Float64 = -Inf
     if  age_index > 45  ##Utility functions for retired population
         if c>0
             u = (c^((1-sigma) * gamma))/(1 - sigma)
@@ -143,10 +143,10 @@ function Backinduct(prim::Primitives,res::Results)  #Function to iterate backwar
             #for a_index = 1:na, z_index=1:nz
             if age_index == 66   ##The problem for those in the last period of life
                 res.val_func[a_index,z_index, age_index] = -Inf #Set a very low initial guess for value function
-                budget = (1+r)*Assets[a_index] + b #
-                c = budget
-                l = 0
-                val = utility(prim, res,c,l,age_index) #Our value function in the last period of life involves no saving
+                budget::Float64 = (1+r)*Assets[a_index] + b #
+                c::Float64 = budget
+                l::Float64 = 0
+                val::Float64 = utility(prim, res,c,l,age_index) #Our value function in the last period of life involves no saving
                 #val =  (c^((1-sigma)*gamma))/(1-sigma)
                 if val > res.val_func[a_index,z_index, age_index]   ##Check if our value function is greater than initital guess
                     res.val_func[a_index,z_index,age_index] = val #update value of this value function
@@ -187,7 +187,7 @@ function Backinduct(prim::Primitives,res::Results)  #Function to iterate backwar
 
                     budget = (1+r)*Assets[a_index] + w*(1-theta)*produc[age_index,z_index]*l  ##Our state is now very important
                     c = budget - Assets[ap_index]
-                    val = utility(prim, res,c,l,age_index) + beta*sum(res.val_func[ap_index,:,age_index+1].*markov[z_index,:]) ##value function now heavily impacted by expectation over future productivity states
+                    val = utility(prim, res,c,l,age_index) .+ beta.*(res.val_func[ap_index,1,age_index+1].*markov[z_index,1]+res.val_func[ap_index,2,age_index+1].*markov[z_index,2]) ##value function now heavily impacted by expectation over future productivity states
                     if val > res.val_func[a_index,z_index,age_index] #Same progression as before
                         res.val_func[a_index,z_index, age_index] = val
                         res.pol_func[a_index,z_index,age_index] = Assets[ap_index] #Update our saving
@@ -227,14 +227,14 @@ Plots.savefig("C:/Users/mcket/OneDrive/Documents/Fall 2022/ECON899-Computational
  function Fdist_sum(prim::Primitives,res::Results)  ##Function to calculate distribution
     @unpack N,n,nz,na, Assets, markov=prim
     @unpack F = res
-    F = zeros(na,nz,N) #reinitialization each loops fixes weird distribution being too big problem
-    pop_weights = ones(66) #Initial weights
+    F::Array{Float64,3} = zeros(na,nz,N) #reinitialization each loops fixes weird distribution being too big problem
+    pop_weights::Array{Float64,1} = ones(66) #Initial weights
     #mu = zeros(N,nz)
     for j=1:N-1
         pop_weights[j+1] = pop_weights[j]/(n+1)
     end  ##Instantiate relative population sizes
-    pop_sum = sum(pop_weights)
-    pop_normal = pop_weights/pop_sum #Normalize the population
+    pop_sum::Float64  = sum(pop_weights)
+    pop_normal::Array{Float64,1} = pop_weights/pop_sum #Normalize the population
     F[1,1,1] = .2037 #weights of population with initital productivities
     F[1,2,1] = .7963
     # s=-Inf
@@ -368,6 +368,10 @@ end
 ###The real test
 #prim, res = Initialize()
 #pop_weights,pop_sum,pop_normal, F =  Fdist_sum(prim,res)
+
+println("Experiment 1")
+prim, res = Initialize()
+@time Run_all(prim,res, 1e-3, .3)
 
 ## Experiment 1
 # function statdistSS(prim::Primitives, res::Results)
