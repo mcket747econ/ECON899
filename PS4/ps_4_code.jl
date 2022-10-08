@@ -1,7 +1,7 @@
 
 #Problem Set 3 Code
 
-using Plots, Parameters, SetFields
+using Plots, Parameters, SetField
 @with_kw struct Primitives
     age_retire::Int64 = 46
     theta::Float64 = 0.11
@@ -368,10 +368,6 @@ end
 ###The real test
 #prim, res = Initialize()
 #pop_weights,pop_sum,pop_normal, F =  Fdist_sum(prim,res)
-
-println("Experiment 1")
-prim, res = Initialize()
-@time Run_all(prim,res, 1e-3, .3)
 
 ## Experiment 1
 # function statdistSS(prim::Primitives, res::Results)
