@@ -23,6 +23,7 @@ mutable struct new_primitives
     F_t::Array{Float64,4}
     T::Int64
     T_array::Array{Int64,1}
+    pop_normal::Array{Float64,1}
 end
 
 
@@ -39,7 +40,8 @@ function Initialize2()
     lab_func_t = zeros(prim.na,prim.nz,prim.N,T)
     pol_func_t = zeros(prim.na,prim.nz,prim.N,T)
     F_t = zeros(prim.na,prim.nz,prim.N,T)
-    res2 = new_primitives(T_delta,l_delta, K_t, K_potential, L_t,sav_func_t,val_func_t,lab_func_t, pol_func_t,F_t,T,T_array)
+    pop_normal = ones(66)
+    res2 = new_primitives(T_delta,l_delta, K_t, K_potential, L_t,sav_func_t,val_func_t,lab_func_t, pol_func_t,F_t,T,T_array,pop_normal)
     res2
 
 
@@ -87,13 +89,13 @@ function shoot_backward(prim::Primitives,res2)
 
 
     end
-    return res2.val_func_t, res2.pol_func_t, res2.lab_func_t, res2.K_t, res2.sav_func_t
-
-res2.val_func_t, res2.pol_func_t, res2.lab_func_t, res2.K_t, res2.sav_func_t = shoot_backward(prim,res2)
+    return res2.val_func_t, res2.pol_func_t, res2.lab_func_t, res2.K_t, res2.sav_func_t,res2.pop_normal
+end
+res2.val_func_t, res2.pol_func_t, res2.lab_func_t, res2.K_t, res2.sav_func_t,res2.pop_normal = shoot_backward(prim,res2)
 
 
 function shootforward(prim::Primitives,res2::new_primitives,res::Results,F_0,F_n)
-    @unpack na,nz,markov,N,Assets = prim
+    @unpack na,nz,markov,N,Assets,n = prim
     @unpack F = res
     @unpack T = res2
     F_next= zeros(na,nz,N,T)
@@ -103,16 +105,24 @@ function shootforward(prim::Primitives,res2::new_primitives,res::Results,F_0,F_n
             for a_index in 1:na
                 ap_index = 0
                 for z_index in 1:nz
+                    #if F_next[a_index,z_index,age_index,T] > 0
                     ap = res2.pol_func_t[a_index,z_index,age_index,t]
-                    ap_index = 1* argmin(abs.(ap_index.-Assets))
+                    ap_index = 1* argmin(abs.(ap.-Assets))
                     for zp_index in 1:nz
                         F_next[ap_index,zp_index,age_index+1,t+1] += markov[z_index,zp_index]*F_next[a_index,z_index,age_index,t]
+                        #end
                     end
                 end
             end
         end
     end
     F_next
+
+    # for a_index= 1:na,z_index = 1:nz  ###Multiply each measure of the distribution by the normalized population weights
+    #     F_next[a_index,z_index,:,:] = F_next[a_index,z_index,:,:].*pop_normal
+    # end
+    # F_next
+
 
 end
 

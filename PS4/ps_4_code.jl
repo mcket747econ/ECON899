@@ -1,7 +1,7 @@
 
 #Problem Set 3 Code
 
-using Plots, Parameters, SetField
+using Plots, Parameters, Setfield
 @with_kw struct Primitives
     age_retire::Int64 = 46
     theta::Float64 = 0.11
