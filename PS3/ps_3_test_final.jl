@@ -199,7 +199,7 @@ end
 
 
 
-## graphs for question 1 
+## graphs for question 1
 prim, res = Initialize()
 res.v_final= zeros(prim.na,prim.nz,prim.N)
 @time Backinduct(prim,res)
@@ -389,7 +389,7 @@ prim_4 = @set prim_4.z_prod = [.5, .5]
 prim_4 = @set prim_4.produc = prim_4.age_ef * prim_4.z_prod'
 @time Run_all(prim_4,res, 1e-3, .3)
 
-## Experiment 5, exogenous labor 
+## Experiment 5, exogenous labor
 println("Experiment 5")
 prim, res = Initialize()
 prim_5 = @set prim.gamma = 1
@@ -439,3 +439,6 @@ prim_6 = @set prim_6.theta = 0
 @time Run_all(prim_6,res, 1e-3, .3)
 
 >>>>>>>
+
+
+<<<<< ===== >>>>>>>

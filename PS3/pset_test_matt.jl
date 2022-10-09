@@ -60,8 +60,6 @@ mutable struct Results
     #L::Array{Float74,1}
     K_new:: Array{Float64,3} #defining these outside my equation
     L_new:: Array{Float64,3}
-    welf:: Float64
-    CV:: Float64
 end
 
 function Initialize()
@@ -81,9 +79,7 @@ function Initialize()
     L1 = 0  #doesn't really matter, gets filled in later
     K_new = zeros(prim.na,prim.nz,prim.N)
     L_new = zeros(prim.na,prim.nz,prim.age_retire-1)
-    welf = 0.0
-    CV = 0.0
-    res = Results(pol_func,val_func, lab_func,age_j, r,w,b,F, K, L, K1, L1, K_new, L_new, welf, CV)
+    res = Results(pol_func,val_func, lab_func,age_j, r,w,b,F, K, L, K1, L1, K_new, L_new)
     prim, res
 end
 
@@ -285,31 +281,14 @@ function KL_update(prim::Primitives,res::Results, pop_normal, lam::Float64 = .01
     return res.K, res.L, res.r, res.w, res.b
 end
 
-function welfare_fctn(prim::Primitives, res::Results)
-    ##Get relevant parameters for calculation; asset grid, length of asset grid,
-    ##number of states and number of time periods
-    @unpack Assets, na, nz, N = prim
-    a_grid = zeros(na,nz, N)       ##Initialize grid to length Time x Assets x States
-    welfare = res.val_func .* res.F     ##welfare grid - Value Function x distribution
-    welfare = welfare[isfinite.(welfare)]
-    res.welf = sum(welfare)
 
-    for j=1:N, z_index=1:nz
-        a_grid[ :, z_index,j] = Assets
+
+function Run_all(prim::Primitives,res::Results, tol::Float64 = 1e-3, lam::Float64 = .01)
+    if prim.theta == 0.0
+        println("Its 0")
+    else
+        println("STOP")
     end
-
-    #mean_welfare = Base.mean(a_grid,res.F)
-    mean_welfare =sum(a_grid.*res.F)      ##Weight the assets by the distribution
-    var_welfare = sum(res.F.* (a_grid.^2)) - mean_welfare.^2
-    res.CV = mean_welfare / sqrt(var_welfare)
-    res
-end
-
-#welfare_fctn(prim,res)
-
-
-################
-function Run_all(prim::Primitives,res::Results, tol::Float64 = 1e-3, lam::Float64 = .01, kill::Int64 = 1000)
     res.r = (prim.alpha*(res.L^(1-prim.alpha)))/(res.K^(1-prim.alpha)) - prim.delta
     res.w = ((1-prim.alpha)*(res.K^(prim.alpha)))/(res.L^(prim.alpha))
     retired_mass = 0
@@ -319,30 +298,60 @@ function Run_all(prim::Primitives,res::Results, tol::Float64 = 1e-3, lam::Float6
     res.b = (prim.theta*res.w*res.L)/retired_mass
     stop = 0
     count = 1
-    while  count <= kill && stop == 0
-        #print("iteration: ", count, "     ")
+    while  count <= 100 && stop == 0
+        print("iteration: ", count, "     ")
         Backinduct(prim,res)
         pop_Weights, pop_sum, pop_normal, res.F = Fdist_sum(prim,res) ##rename with the appropriate function
         K1, L1 = MarketClearing(prim,res)
         if (abs(K1-res.K) + abs(L1-res.L)) > tol
-            #print((abs(K1-res.K) + abs(L1-res.L)), "       ")
+            print((abs(K1-res.K) + abs(L1-res.L)), "       ")
             K, L, r, w, b = KL_update(prim, res, pop_normal, lam) #can adjust as needed, .01 is what the prompt says but supposedly we can go fast
             count += 1
         else
             stop = 1
         end
     end
-    welfare_fctn(prim,res) #get aggregate welfare
-    print("Finished in ",count," iterations")
-    println("Capital: ", res.K)
-    println("Labor: ", res.L)
-    println("Rent: ", res.r)
-    println("wages: ", res.w)
-    println("b: ", res.b)
-    println("Welfare: ", res.welf)
-    println("CV: ", res. CV)
 end
 
 ###The real test
 prim, res = Initialize()
 @time Run_all(prim,res, 1e-1, .12)
+
+
+
+
+function experiments(prim::Primitives,res::Results)
+    @unpack theta = prim
+    ##Experiment 1
+    prim.theta = 0.0
+    Run_all(prim::Primitives,res::Results, 1e-3, .01)
+    println("Equilbrium Capital is: ",res.K)
+    println("Equilbrium Labor is: ",res.L)
+    resk1 = res.K
+    resL1 = res.L
+    ##Experiment 2
+    theta = .11
+    Run_all(prim::Primitives,res::Results,1e-3, .01)
+
+    println("Equilbrium Capital is: ",res.K)
+    println("Equilbrium Labor is: ",res.L)
+    resk2 = res.K
+    resL2 = res.L
+    return resk1, resL1, resk2, resL2
+
+end
+
+
+k1, l1, k2,l2 = experiments(prim,res)
+
+
+    ##Experiment 3
+
+
+
+
+
+
+
+
+end

@@ -88,7 +88,7 @@ function shoot_backward(prim::Primitives,res2)
 
     end
     return res2.val_func_t, res2.pol_func_t, res2.lab_func_t, res2.K_t, res2.sav_func_t
-end
+
 res2.val_func_t, res2.pol_func_t, res2.lab_func_t, res2.K_t, res2.sav_func_t = shoot_backward(prim,res2)
 
 
@@ -99,14 +99,14 @@ function shootforward(prim::Primitives,res2::new_primitives,res::Results,F_0,F_n
     F_next= zeros(na,nz,N,T)
     F_next[:,:,:,1] = F_0
     for t in 1:T-1
-        for age_index = 1:N
+        for age_index = 1:N-1
             for a_index in 1:na
                 ap_index = 0
                 for z_index in 1:nz
                     ap = res2.pol_func_t[a_index,z_index,age_index,t]
                     ap_index = 1* argmin(abs.(ap_index.-Assets))
                     for zp_index in 1:nz
-                        F_next[ap_index,zp_index,age_index,t+1] += markov[z_index,zp_index]*F_next[a_index,z_index,age_index,t]
+                        F_next[ap_index,zp_index,age_index+1,t+1] += markov[z_index,zp_index]*F_next[a_index,z_index,age_index,t]
                     end
                 end
             end
@@ -121,17 +121,20 @@ res2.F_t = shootforward(prim,res2,res,F_0,F_n)
 
 function new_equilibrium(prim::Primitives,res2::new_primitives,res::Results,K_0)
     @unpack T,sav_func_t,F_t =res2
-    @unpack N, na, nz = prim
+    @unpack N, na, nz, Assets = prim
 
    K_potential = zeros(T)
    K_potential[1] = K_0
    for t in 1:T-1
-        println("Were on Age: ",t)
+        println("We're on Transition period: ",t)
         for age_index in 1:N
+            # println("We're on Age: ",age_index)
             for a_index in 1:na
+                # println("We're on Asset: ",a_index)
                 for z_index in 1:nz
-                    K_potential[t+1] += sav_func_t[a_index,z_index,age_index,t]*F_t[a_index,z_index,age_index,t]
+                    K_potential[t+1] += Assets[a_index]*F_t[a_index,z_index,age_index,t+1]
                 end
+                # sav_func_t[a_index,z_index,age_index,t]
             end
         end
     end
