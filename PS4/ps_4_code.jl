@@ -206,6 +206,7 @@ end
 
 
 
+
 ## graphs for question 1
 prim, res = Initialize()
 # res.v_final= zeros(prim.na,prim.nz,prim.N)

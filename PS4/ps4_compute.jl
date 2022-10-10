@@ -24,6 +24,11 @@ mutable struct new_primitives
     T::Int64
     T_array::Array{Int64,1}
     pop_normal::Array{Float64,1}
+    Assets::Array{Float64,4}
+    w_t::Array{Float64, 1}                                                    # transition path of wage
+    r_t::Array{Float64, 1}                                                    # transition path of interest rate
+    b_t::Array{Float64, 1}
+    theta::Array{Float64}
 end
 
 
@@ -41,7 +46,11 @@ function Initialize2()
     pol_func_t = zeros(prim.na,prim.nz,prim.N,T)
     F_t = zeros(prim.na,prim.nz,prim.N,T)
     pop_normal = ones(66)
-    res2 = new_primitives(T_delta,l_delta, K_t, K_potential, L_t,sav_func_t,val_func_t,lab_func_t, pol_func_t,F_t,T,T_array,pop_normal)
+    Assets = zeros(prim.na,prim.nz,prim.N,T)
+    res2.r_t = (alpha.*(L_t.^(1.-alpha)))./(K_t.^(1.-alpha)) .- delta
+    res2.w_t = ((1.-alpha).*(K_t.^(alpha)))./(L_t.^(alpha))
+    res2.b_t = (theta.*w_t.*L_t)./retired_mass
+    res2 = new_primitives(T_delta,l_delta, K_t, K_potential, L_t,sav_func_t,val_func_t,lab_func_t, pol_func_t,F_t,T,T_array,pop_normal,Assets)
     res2
 
 
@@ -94,12 +103,17 @@ end
 res2.val_func_t, res2.pol_func_t, res2.lab_func_t, res2.K_t, res2.sav_func_t,res2.pop_normal = shoot_backward(prim,res2)
 
 
-function shootforward(prim::Primitives,res2::new_primitives,res::Results,F_0,F_n)
+function Fdist_t(prim::Primitives,res2::new_primitives,res::Results,F_0,F_n)
+
+
     @unpack na,nz,markov,N,Assets,n = prim
     @unpack F = res
     @unpack T = res2
     F_next= zeros(na,nz,N,T)
     F_next[:,:,:,1] = F_0
+    for t_index = 2:T
+        F_next[1, :,1, t_index] = F_next[1, :, 1, 1]
+    end
     for t in 1:T-1
         for age_index = 1:N-1
             for a_index in 1:na
@@ -109,7 +123,7 @@ function shootforward(prim::Primitives,res2::new_primitives,res::Results,F_0,F_n
                     ap = res2.pol_func_t[a_index,z_index,age_index,t]
                     ap_index = 1* argmin(abs.(ap.-Assets))
                     for zp_index in 1:nz
-                        F_next[ap_index,zp_index,age_index+1,t+1] += markov[z_index,zp_index]*F_next[a_index,z_index,age_index,t]
+                        F_next[ap_index,zp_index,age_index+1,t+1] += markov[z_index,zp_index]*F_next[a_index,z_index,age_index,t]./(1+n)
                         #end
                     end
                 end
@@ -126,8 +140,102 @@ function shootforward(prim::Primitives,res2::new_primitives,res::Results,F_0,F_n
 
 end
 
-res2.F_t = shootforward(prim,res2,res,F_0,F_n)
+res2.F_t = Fdist_t(prim,res2,res,F_0,F_n)
 
+
+function bellman_t(prim::Primitives,res::Results,res2::new_primitives)  #Function to iterate backwards over ages to determine labor supply, asset holdings, as a function of producitivity, and age and future period asset holding
+    @unpack age_retire, theta, gamma, sigma, z_prod, birth_distribution = prim
+    @unpack markov, alpha, delta, beta, N, Assets, na, nz, age_ef, produc = prim
+    @unpack w_t, r_t, b_t, T = res2
+    # res.v_final= zeros(na,nz,N)
+    # w = 1.05 #######
+    # r = 0.05 #######
+    # b = 0.2 #######
+    # K = 3.3 #######
+    # L = 0.3 #######
+    # v_0=1e-10
+    for t = (T-1):-1:1
+        for age_index = 66:-1:1
+            println("Age: ", age_index)
+            #if age_index == 66
+            for a_index = 1:na, z_index=1:nz #Iterate over potential asset holdings
+
+                #for a_index = 1:na, z_index=1:nz
+                if age_index == 66   ##The problem for those in the last period of life
+                    res.val_func[a_index,z_index, age_index] = -Inf #Set a very low initial guess for value function
+                    budget::Float64 = (1+r_t[t])*Assets[a_index] + b_t[t] #
+                    c::Float64 = budget
+                    l::Float64 = 0
+                    val::Float64 = utility(prim, res,c,l,age_index) #Our value function in the last period of life involves no saving
+                    #val =  (c^((1-sigma)*gamma))/(1-sigma)
+                    if val > res.val_func[a_index,z_index, age_index]   ##Check if our value function is greater than initital guess
+                        res.val_func[a_index,z_index,age_index] = val #update value of this value function
+                        res.pol_func[a_index,:,age_index] .= zero(UInt32) #We set both labor and saving to zero in this period
+                        res.lab_func[a_index,:,age_index] .= zero(UInt32)
+                         #I am addi
+                        ##Add the value function over all asset levels for those in the final period of life.
+                        # res.v_final[:,:,66] .= v_0
+                    end
+
+
+
+                elseif age_index >= 46 && age_index < 66  ##The problem for retired agents
+                    res.val_func[a_index,z_index, age_index] = -Inf #Initial value function
+                    l = 0
+                #for a_index = 1:na, z_index = 1:nz
+                    budget = (1+r_t[t])*Assets[a_index] + b_t[t]
+                    for ap_index = 1:na, zp_index = 1:nz  ##We now care about saving. Include state just for consistency
+                        c = budget - Assets[ap_index]
+
+                        val =utility(prim, res,c,l,age_index)+ beta*res.val_func[ap_index,zp_index,age_index+1]
+                        if val > res.val_func[a_index,z_index,age_index]   ##Conduct the same progressions as above. Updating the value function if a level of saving produces higher continuation value than the previous
+                            res.val_func[a_index,z_index, age_index] = val ##level of saving
+                            res.pol_func[a_index,:, age_index] .= Assets[ap_index]  ##we update our saving function
+                            res.lab_func[a_index,:, age_index] .= zero(UInt32) #We dont work
+                             ##Add the value function over all asset levels for those in the final period of life.
+                        end
+
+                    end
+                    # res.val_func[:,:,age_index] .= val
+                    # res.v_final[:,:,age_index] .= val
+            #else age_index < 46
+        else age_index < 46  ##the problem for workers
+                    res.val_func[a_index,z_index, age_index] = -Inf
+                #for a_index = 1:na, z_index = 1:nz
+                    for ap_index = 1:na
+                        l = labor(prim,res,age_index,a_index,ap_index,z_index)
+
+                        budget = (1+r_t[t])*Assets[a_index] + w_t[t]*(1-theta[t])*produc[age_index,z_index]*l  ##Our state is now very important
+                        c = budget - Assets[ap_index]
+                        val = utility(prim, res,c,l,age_index) .+ beta.*(res.val_func[ap_index,1,age_index+1].*markov[z_index,1]+res.val_func[ap_index,2,age_index+1].*markov[z_index,2]) ##value function now heavily impacted by expectation over future productivity states
+                        if val > res.val_func[a_index,z_index,age_index] #Same progression as before
+                            res.val_func[a_index,z_index, age_index] = val
+                            res.pol_func[a_index,z_index,age_index] = Assets[ap_index] #Update our saving
+                            res.lab_func[a_index,z_index,age_index] = l ##Now we have to set our
+                            ##Add the value function over all asset levels for those in the final period of life.
+                        end
+                    end
+                    # res.val_func[:,:,age_index] .= v_0
+
+                end
+                # res.v_final[:,:,age_index] .= v_0
+            end
+        end
+        return res.val_func, res.pol_func, res.lab_func
+    end
+end
+
+function labor_t(prim::Primitives,res::Results,age_index,a_index,ap_index,z_index,t::Int64)  ##Optimal Labor Supply function
+    @unpack theta, gamma, produc,Assets = prim
+    @unpack w_t,r_t,b_t = res2
+    l::Float64 = (gamma*(1-theta[t])*produc[age_index,z_index]*w_t[t]-(1-gamma)*((1+r_t[t])*Assets[a_index]-Assets[ap_index]))/((1-theta[t])*w_t[t]*produc[age_index, z_index]) ##Optimal Endogenous labor supply, including depreciation
+    if l < 0
+        l = 0
+    elseif l > 1
+        l = 1
+    end
+    l
+end
 
 function new_equilibrium(prim::Primitives,res2::new_primitives,res::Results,K_0)
     @unpack T,sav_func_t,F_t =res2
@@ -135,32 +243,83 @@ function new_equilibrium(prim::Primitives,res2::new_primitives,res::Results,K_0)
 
    K_potential = zeros(T)
    K_potential[1] = K_0
-   for t in 1:T-1
-        println("We're on Transition period: ",t)
-        for age_index in 1:N
-            # println("We're on Age: ",age_index)
-            for a_index in 1:na
-                # println("We're on Asset: ",a_index)
-                for z_index in 1:nz
-                    K_potential[t+1] += Assets[a_index]*F_t[a_index,z_index,age_index,t+1]
-                end
-                # sav_func_t[a_index,z_index,age_index,t]
-            end
-        end
-    end
-    K_potential
+   Assets = zeros(na,na,N)
 
+        # println("We're on Transition period: ",t)
+        #for age_index in 1:N
+        # println("We're on Age: ",age_index)
+    for age_index in 1:N
+        # println("We're on Asset: ",a_index)
+        for z_index in 1:nz
+            A_grid[:, z_index,age_index] = Assets
+            #K_potential[t+1] += Assets[a_index]*F_t[a_index,z_index,age_index,t+1]
+        end
+        # sav_func_t[a_index,z_index,age_index,t]
+    end
+
+    for t in 1:T
+        K_potential[t] = sum(F_t[:,:,:,t].*A_grid)
+    end
+
+    #K_potential = sum(F_t[:,:,:,t].*A_grid)
+
+    return A_grid, K_potential
 end
 
-res2.K_potential = new_equilibrium(prim,res2,res,K_0)
+        #end
+#         K_potential[t]= sum(F_t[:,:,:,t].*A_grid[:,:,:,t])
+#     end
+#     K_potential
+#
+# end
+# A = new_equilibrium()
+
+res2.A_grid,res2.K_potential = new_equilibrium(prim,res2,res,K_0)
 
 
 
 ###Now We Compute the Transition Path
+function overall_solve(prim::Primitives,res::Results,res2::new_primitives,t::Int64,t::Int64)
+        @unpack alpha, delta, age_retire, N, na,nz = prim
+        T_delta = 20
+        tol = 0.01
+        i =
+        lambda = 0.5
+        path = Initialize(some things)
+        while true
+            while true
+                i += 1
+                println("***********************************")
+                println("Trial #", i)
+                res2.val_func_t, res2.pol_func_t, res2.lab_func_t = bellman_t(prim, res, path, T)
+                res2.F_t = F_dist_t(prim, res, res2, F_0,F_n)
+                K_t
+                L_t
 
 
 
 
+
+end
+
+
+function aggregate_K_path(prim::Primitives, res:: Results, res2::new_primitives, T::Int64)
+    @unpack F_t = res2
+    @unpack na, nz, N, e, Assets = prim
+
+    K_path = zeros(T)
+    K_path[1] = K_0
+    A_grid = zeros(na, nz, N)
+
+    for age_index = 1:N, z_index = 1:nz
+        A_grid[:, z_index, age_index] = a_grid
+    end
+
+    for t_index = 1:T
+        K_path[t_index] = sum(F_t[:, :, :, t_index] .* A_grid)
+    end
+    K_path
+end
 
 
 
@@ -204,3 +363,4 @@ res2.K_potential = new_equilibrium(prim,res2,res,K_0)
 ##Make a matrix
 
 end
+b
