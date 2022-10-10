@@ -59,9 +59,9 @@ res2 = Initialize2()
 function KL_update2(prim::Primitives,res::Results, pop_normal,k,l, lam::Float64 = .01) #Marking part of the loop a function
     @unpack alpha, theta, age_retire, N, delta = prim
     @unpack K1, L1, K, L, w, r, b = res
-    res.K = lam .* k .+ (1 - lam) .* K1
-    res.L =  lam .* l .+ (1 - lam) .* L1
-    res.r = (alpha.*(L.^(1.-alpha)))./(K^(1-.alpha)) .- delta
+    res.K = lam .* k .+ (1- lam) .* K1
+    res.L =  lam .* l .+ (1- lam) .* L1
+    res.r = (alpha .*(L .^(1-alpha))) ./(K^(1-alpha)) .- delta
     res.w = ((1-alpha).*(K.^(alpha)))./(L.^(alpha))
     retired_mass = sum(pop_normal[age_retire:N])
     #for j in age_retired:N #or can do a sum across those numbers in mu, I'm not sure how this will be stored from stat distribution function
