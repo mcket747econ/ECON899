@@ -37,14 +37,17 @@ function Initialize2(t_iter::Int64)
     T_array = collect(range(1,length=30,stop=30))
     T_delta = (K_n - K_0 )/prim.T
     l_delta = (L_n - L_0)/prim.T
-    K_t = zeros(T)
-    K_potential = zeros(T)
-    L_t = zeros(T)
+    K_t = collect(range(K_0, stop =K_n, length = T))
+    # K_potential = zeros(T)
+    L_t = collect(range(L_0, stop = L_n, length = T))
+    # K_t_init = collect(range(K_0, stop =K_n, length = T))
+    # L_t_init = collect(range(L_0, stop = L_n, length = T))
     val_func_t = zeros(prim.na,prim.nz,prim.N,T)
     sav_func_t = zeros(prim.na,prim.nz,prim.N,T)
     lab_func_t = zeros(prim.na,prim.nz,prim.N,T)
     pol_func_t = zeros(prim.na,prim.nz,prim.N,T)
     F_t = zeros(prim.na,prim.nz,prim.N,T)
+    F_t[:,:,:,1] = F_0
     pop_normal = ones(66)
     Assets = zeros(prim.na,prim.nz,prim.N,T)
     r_t = (prim.alpha.*(L_t.^(1-prim.alpha)))./(K_t.^(1-prim.alpha)).-prim.delta
@@ -286,57 +289,78 @@ end
 res2.K_potential = agg_L_t(prim,res2,res,K_0)
 
 function agg_L_t(prim::Primitives,res2::new_primitives,res::Results,0_0)
-    @unpack T,sav_func_t,F_t =res2
+    @unpack T,sav_func_t,F_t,lab_func_t =res2
     @unpack N, na, nz, Assets = prim
 
-   K_potential = zeros(T)
-   K_potential[1] = K_0
-   A_array = zeros(na,nz,N)
+   L_potential = zeros(T)
+   L_potential[1] = L_0
+   e_array = zeros(na,nz,N)
 
         # println("We're on Transition period: ",t)
         #for age_index in 1:N
         # println("We're on Age: ",age_index)
-    for age_index in 1:N
+    for a_index = 1:na
         # println("We're on Asset: ",a_index)
         for z_index in 1:nz
-            A_array[:, z_index,age_index] = Assets
+            e_array[a_index, z_index,1:45] = produc[:,z_index]
             #K_potential[t+1] += Assets[a_index]*F_t[a_index,z_index,age_index,t+1]
         end
         # sav_func_t[a_index,z_index,age_index,t]
     end
-    println(length(A_array))
+
+    println(length(e_array))
     for t in 1:T
-        K_potential[t] = sum(F_t[:,:,:,t] .* A_array)
+        L_potential[t] = sum(F_t[:,:,:,t] .* lab_func_t[:,:,:,t] .* e_array)
     end
 
     #K_potential = sum(F_t[:,:,:,t].*A_grid)
 
-    return  K_potential
+    return  L_potential
 end
 
 ###Now We Compute the Transition Path
-function overall_solve(prim::Primitives,res::Results,res2::new_primitives,t::Int64,t::Int64)
+    function overall_solve(prim::Primitives,res::Results,res2::new_primitives,t::Int64)
         @unpack alpha, delta, age_retire, N, na,nz = prim
         T_delta = 20
+        T = 30
         tol = 0.01
         i =
         lambda = 0.5
-        path = Initialize(some things)
+        res2= Initialize2(t)
         while true
             while true
                 i += 1
                 println("***********************************")
                 println("Trial #", i)
                 res2.val_func_t, res2.pol_func_t, res2.lab_func_t = bellman_t(prim, res, path, T)
-                res2.F_t = F_dist_t(prim, res, res2, F_0,F_n)
-                K_t = agg_K_t(prim,res2,res)
-                L_t =
-
-
-
-
+                res2.F_t = Fdist_t(prim, res, res2, F_0,F_n)
+                K_t1 = agg_K_t(prim,res2,res,K_0)
+                L_t1 = agg_L_t(prim,res2,res,L_0)
+                display(plot([res2.K_t K_t1 repeat([K_0], T) repeat([K_n], T)],
+                         label = ["K Guess" "K Path" "Stationary K w/ SS" "Stationary K w/o SS"],
+                         title = "Capital Transition Path", legend = :bottomright))
+                diff = maximum(abs.(res2.K_t .- K_t1)./K_t1) + maximum(abs.(res2.L_t .- L_t1)./L_t1)
+                @printf("Difference: %0.3f.", float(diff))
+                println("")
+                if dist > tol
+                    adjust_path
+                else
+                    break
+                end
+            end
+            error = abs(res2.K_t-K_n)/K_n
+            if error > tol
+                T += T_delta
+                res2 = Initialize2(T,t)
+            else
+                break
+            end
+        end
+        res2, T
+    end
 
 end
+
 
 
 function aggregate_K_path(prim::Primitives, res:: Results, res2::new_primitives, T::Int64)
