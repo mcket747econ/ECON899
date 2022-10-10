@@ -32,9 +32,9 @@ mutable struct new_primitives
 end
 
 
-function Initialize2(t_iter::Int64)
-    T = 30
-    T_array = collect(range(1,length=30,stop=30))
+function Initialize2(T::Int64,t_iter::Int64)
+    # T = 30
+    T_array = collect(range(1,length=30,stop=T))
     T_delta = (K_n - K_0 )/prim.T
     l_delta = (L_n - L_0)/prim.T
     K_t = collect(range(K_0, stop =K_n, length = T))
@@ -318,11 +318,37 @@ function agg_L_t(prim::Primitives,res2::new_primitives,res::Results,0_0)
     return  L_potential
 end
 
+function KL_update2(prim::Primitives,res2::new_primitives, pop_normal,K_t1,L_t1, lam,F_0) #Marking part of the loop a function
+    @unpack alpha, theta, age_retire, N, delta,na,nz = prim
+    @unpack K_t, L_t, theta = res2
+    retired_mass = sum(pop_normal[age_retire:N])
+    K_tnew = lam .* K_t1 .+ (1 - lam) .* K_t
+    L_tnew=  lam .* L_t1 .+ (1 - lam) .* L_t
+    F_tnew = zeros(na,na,N,Y)
+    F_tnew[:,:,:,1] = F_0
+    w_tnew = ((1-alpha).*(K_tnew.^(alpha)))./(L_tnew.^(alpha))
+    r_tnew = (alpha.*(L_tnew.^(1.-alpha)))./(K_tnew^(1-.alpha)) .- delta
+    b_tnew = (theta.*w_tnew.*L_tnew)./retired_mass
+    res2.K_t = K_tnew
+    res2.L_t = L_tnew
+    res2.F_t = F_tnew
+    res2.r_t = r_tnew
+    res2.w_t = w_tnew
+    # retired_mass = sum(pop_normal[age_retire:N])
+    #for j in age_retired:N #or can do a sum across those numbers in mu, I'm not sure how this will be stored from stat distribution function
+     #   retired_mass += (1/1.011)^j
+    #end
+    #retired_mass = sum(mu(age_retired:N,:,:)) #sum alternative once I know how mass is stored
+    res2.b_t = b_tnew
+    return
+end
+
+
 ###Now We Compute the Transition Path
-    function overall_solve(prim::Primitives,res::Results,res2::new_primitives,t::Int64)
+function overall_solve(prim::Primitives,res::Results,res2::new_primitives,t::Int64)
         @unpack alpha, delta, age_retire, N, na,nz = prim
         T_delta = 20
-        T = 30
+        # T = 30
         tol = 0.01
         i =
         lambda = 0.5
@@ -343,43 +369,28 @@ end
                 @printf("Difference: %0.3f.", float(diff))
                 println("")
                 if dist > tol
-                    adjust_path
+                    KL_update2(prim,res,pop_normal,K_t1,L_t1,lambda,F_0)
+                    println("Paths Adjusted")
                 else
+                    println("Paths Converged")
                     break
                 end
             end
             error = abs(res2.K_t-K_n)/K_n
             if error > tol
                 T += T_delta
+                println("Length Increased")
                 res2 = Initialize2(T,t)
             else
+                println("Iteration Done")
                 break
             end
         end
         res2, T
-    end
-
 end
 
 
 
-function aggregate_K_path(prim::Primitives, res:: Results, res2::new_primitives, T::Int64)
-    @unpack F_t = res2
-    @unpack na, nz, N, e, Assets = prim
-
-    K_path = zeros(T)
-    K_path[1] = K_0
-    A_grid = zeros(na, nz, N)
-
-    for age_index = 1:N, z_index = 1:nz
-        A_grid[:, z_index, age_index] = a_grid
-    end
-
-    for t_index = 1:T
-        K_path[t_index] = sum(F_t[:, :, :, t_index] .* A_grid)
-    end
-    K_path
-end
 
 
 
