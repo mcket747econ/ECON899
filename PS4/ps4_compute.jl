@@ -1,5 +1,5 @@
 using Parameters, Plots, Printf, Setfield, DataFrames, DelimitedFiles
-cd("C:/Users/mcket/OneDrive/Documents/Fall 2022/ECON899-Computational/899Code/899/ECON899/PS4")
+# cd("C:/Users/mcket/OneDrive/Documents/Fall 2022/ECON899-Computational/899Code/899/ECON899/PS4")
 # Pkg.add("Accessors")
 include("ps_4_code.jl")
 prim, res = Initialize()
@@ -435,3 +435,24 @@ end
 
 end
 b
+
+
+## Equivalent Variation and Vote Share
+
+function EV(prim::Primitives, res2::Results)
+    @unpack N, na, nz, alpha, lam = prim
+    ev = zeros(N, na, nz)
+    ev = (res2.val_func_path[:, :, :, 1] ./ val_func_n).^(1/(lam * (1 - alpha)))
+    ev_cf = (val_func_0./ val_func_n).^(1/(lam * (1 - alpha)))
+    evj = zeros(N)
+    evj_cf = zeros(N)
+    for j=1:N
+        evj[j] = sum(EV[j, :, :] .* F_n[j, :, :]) ./ sum(F_n[j, :, :])
+        evj_cf[j] = sum(ev_cf[j, :, :] .* F_n[j, :, :]) ./ sum(F_n[j, :, :])
+    end
+    evj, evj_cf, ev, ev_cf
+end
+
+# function Vote_share(EV::Array{Float64})
+    
+# end

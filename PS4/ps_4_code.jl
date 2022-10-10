@@ -363,8 +363,14 @@ function Run_all(prim::Primitives,res::Results, tol::Float64 = .01, lam::Float64
     println("Welfare: ", res.welf)
     println("CV: ", res.CV)
 
+
+    Equiv_variation = EV(prim, res)
+    vs = sum((ev.>=1).*F_n)
+    println("Equivalent Variation is", Equiv_variation)
+    println("Vote Share", vs)
     return res.val_func, res.pol_func,res.K, res.L, res.r, res.w, res.b, res.F
 end
+
 
 ###The real test
 #prim, res = Initialize()
