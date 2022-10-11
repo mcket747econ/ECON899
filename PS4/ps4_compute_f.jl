@@ -416,18 +416,21 @@ end
 elapse = @elapsed res2, T = overall_solve(prim, res,1, 30)
 
 
-# function EV(prim::Primitives, res2::Results,lam::Float64 = .01)
-#     @unpack N, na, nz, alpha = prim
-#     ev = zeros(N, na, nz)
-#     evj = zeros(N)
-#
-#     ev = (res2.val_func[:, :, :, 1] ./ val_func_n).^(1/(lam .* (1 - alpha)))
-#     ev_cf = (val_func_0./ val_func_n).^(1/(lam .* (1 - alpha)))
-#     evj_cf = zeros(N)
-#     for j=1:N
-#         evj[j] = sum(ev[j, :, :] .* F_n[j, :, :]) ./ sum(F_n[j, :, :])
-#         evj_cf[j] = sum(ev_cf[j, :, :] .* F_n[j, :, :]) ./ sum(F_n[j, :, :])
-#     end
-#     evj, evj_cf, ev, ev_cf
-# end
+function EV(prim::Primitives, res::Results,res2::new_primitives,lam::Float64)
+    @unpack N, na, nz, alpha,sigma = prim
+    ev = zeros(na, nz, N)
+    evj = zeros(N)
+    ev = (res2.val_func_t[:, :, :, 1] ./ val_func_0).^(1/(lam * (1 - sigma)))
+    ev_cf = (val_func_n./ val_func_0).^(1/(lam * (1 - sigma)))
+    evj_cf = zeros(N)
+    for j=1:N
+        evj[j] = sum(ev[:, :, j] .* F_n[:, :, j]) ./ sum(F_n[:, :, j])
+        evj_cf[j] = sum(ev_cf[:, :, j] .* F_n[:, :, j]) ./ sum(F_n[:, :, j])
+    end
+    evj, evj_cf, ev, ev_cf
+end
+evj, evj_cf, ev, ev_cf = EV(prim,res,res2,0.42)
+sum((ev.>=1).*F_0)
+
+#(res2.val_func_t[:, :, :, 1] ./ val_func_0).^(1/(lam * (1 - sigma)))
 
