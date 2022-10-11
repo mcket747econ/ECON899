@@ -1,12 +1,12 @@
 using Parameters, Plots, Printf, Setfield, DataFrames, DelimitedFiles
-# cd("C:/Users/mcket/OneDrive/Documents/Fall 2022/ECON899-Computational/899Code/899/ECON899/PS4")
+cd("C:/Users/mcket/OneDrive/Documents/Fall 2022/ECON899-Computational/899Code/899/ECON899/PS4")
 # Pkg.add("Accessors")
 include("ps_4_code.jl")
 prim, res = Initialize()
 
-val_func_0,pol_func_0, K_0, L_0, r_0, w_0, b_0, F_0 =  Run_all(prim,res, .01, .3)
+val_func_0,pol_func_0,lab_func_0, K_0, L_0, r_0, w_0, b_0, F_0 =  Run_all(prim,res, .01, .3)
 prim_2 = @set prim.theta = 0
-val_func_n, pol_func_n, K_n, L_n, r_n, w_n, b_n, F_n = Run_all(prim_2,res, .01, .3)
+val_func_n, pol_func_n,lab_func_n, K_n, L_n, r_n, w_n, b_n, F_n = Run_all(prim_2,res, .01, .3)
 
 
 mutable struct new_primitives
@@ -38,7 +38,7 @@ function Initialize2(T::Int64,t_iter::Int64)
     T_delta = (K_n - K_0 )/prim.T
     l_delta = (L_n - L_0)/prim.T
     K_t = collect(range(K_0, stop =K_n, length = T))
-    # K_potential = zeros(T)
+    K_potential = zeros(T)
     L_t = collect(range(L_0, stop = L_n, length = T))
     # K_t_init = collect(range(K_0, stop =K_n, length = T))
     # L_t_init = collect(range(L_0, stop = L_n, length = T))
@@ -59,22 +59,7 @@ function Initialize2(T::Int64,t_iter::Int64)
 
 
 end
-res2 = Initialize2(10)
-function KL_update2(prim::Primitives,res::Results, pop_normal,k,l, lam::Float64 = .01) #Marking part of the loop a function
-    @unpack alpha, theta, age_retire, N, delta = prim
-    @unpack K1, L1, K, L, w, r, b = res
-    res.K = k
-    res.L = l
-    res.r = (alpha*(L^(1-alpha)))/(K^(1-alpha)) - delta
-    res.w = ((1-alpha)*(K^(alpha)))/(L^(alpha))
-    retired_mass = sum(pop_normal[age_retire:N])
-    #for j in age_retired:N #or can do a sum across those numbers in mu, I'm not sure how this will be stored from stat distribution function
-     #   retired_mass += (1/1.011)^j
-    #end
-    #retired_mass = sum(mu(age_retired:N,:,:)) #sum alternative once I know how mass is stored
-    res.b = (theta*w*L)/retired_mass
-    return  res.r, res.w, res.b
-end
+res2 = Initialize2
 
 
 function shoot_backward(prim::Primitives,res2)
@@ -102,7 +87,7 @@ function shoot_backward(prim::Primitives,res2)
 
 
     end
-    return res2.val_func_t, res2.pol_func_t, res2.lab_func_t, res2.K_t, res2.sav_func_t,res2.pop_normal
+    return res2.pop_normal # return res2.val_func_t, res2.pol_func_t, res2.lab_func_t, res2.K_t, res2.sav_func_t,res2.pop_normal
 end
 res2.val_func_t, res2.pol_func_t, res2.lab_func_t, res2.K_t, res2.sav_func_t,res2.pop_normal = shoot_backward(prim,res2)
 
@@ -149,10 +134,10 @@ end
 res2.F_t = Fdist_t(prim,res2,res,F_0,F_n)
 
 
-function bellman_t(prim::Primitives,res::Results,res2::new_primitives)  #Function to iterate backwards over ages to determine labor supply, asset holdings, as a function of producitivity, and age and future period asset holding
-    @unpack age_retire, theta, gamma, sigma, z_prod, birth_distribution = prim
+function bellman_t(prim::Primitives,res::Results,res2::new_primitives,T)  #Function to iterate backwards over ages to determine labor supply, asset holdings, as a function of producitivity, and age and future period asset holding
+    @unpack age_retire, gamma, sigma, z_prod, birth_distribution = prim
     @unpack markov, alpha, delta, beta, N, Assets, na, nz, age_ef, produc = prim
-    @unpack w_t, r_t, b_t, T = res2
+    @unpack w_t, r_t, b_t,theta = res2
     # res.v_final= zeros(na,nz,N)
     # w = 1.05 #######
     # r = 0.05 #######
@@ -163,9 +148,9 @@ function bellman_t(prim::Primitives,res::Results,res2::new_primitives)  #Functio
     val_func_t = zeros(na, nz, N, T)
     pol_func_t = zeros(na, nz, N, T)
     lab_func_t= zeros(na, nz, N, T)
-    val_func_t[:, :, :, T] = val_func_t
-    pol_func_t[:, :, :, T] = pol_func_t
-    lab_func_t[:, :, :, T] = lab_func_t
+    val_func_t[:, :, :, T] = val_func_0
+    pol_func_t[:, :, :, T] = pol_func_0
+    lab_func_t[:, :, :, T] = lab_func_0
     for t = (T-1):-1:1
         for age_index = 66:-1:1
             println("Age: ", age_index)
@@ -174,16 +159,16 @@ function bellman_t(prim::Primitives,res::Results,res2::new_primitives)  #Functio
 
                 #for a_index = 1:na, z_index=1:nz
                 if age_index == 66   ##The problem for those in the last period of life
-                    val_func_t[a_index,z_index, age_index] = -Inf #Set a very low initial guess for value function
+                    val_func_t[a_index,z_index, age_index,t] = -Inf #Set a very low initial guess for value function
                     budget::Float64 = (1+r_t[t])*Assets[a_index] + b_t[t] #
                     c::Float64 = budget
                     l::Float64 = 0
                     val::Float64 = utility(prim, res,c,l,age_index) #Our value function in the last period of life involves no saving
                     #val =  (c^((1-sigma)*gamma))/(1-sigma)
-                    if val > val_func_t[a_index,z_index, age_index]   ##Check if our value function is greater than initital guess
-                        val_func_t[a_index,z_index,age_index] = val #update value of this value function
-                        pol_func_t[a_index,:,age_index] .= zero(UInt32) #We set both labor and saving to zero in this period
-                        lab_func_t[a_index,:,age_index] .= zero(UInt32)
+                    if val > val_func_t[a_index,z_index, age_index,t]   ##Check if our value function is greater than initital guess
+                        val_func_t[a_index,z_index,age_index,t] = val #update value of this value function
+                        pol_func_t[a_index,:,age_index,t] .= zero(UInt32) #We set both labor and saving to zero in this period
+                        lab_func_t[a_index,:,age_index,t] .= zero(UInt32)
                          #I am addi
                         ##Add the value function over all asset levels for those in the final period of life.
                         # res.v_final[:,:,66] .= v_0
@@ -192,18 +177,18 @@ function bellman_t(prim::Primitives,res::Results,res2::new_primitives)  #Functio
 
 
                 elseif age_index >= 46 && age_index < 66  ##The problem for retired agents
-                    val_func_t[a_index,z_index, age_index] = -Inf #Initial value function
+                    val_func_t[a_index,z_index, age_index,t] = -Inf #Initial value function
                     l = 0
                 #for a_index = 1:na, z_index = 1:nz
                     budget = (1+r_t[t])*Assets[a_index] + b_t[t]
                     for ap_index = 1:na, zp_index = 1:nz  ##We now care about saving. Include state just for consistency
                         c = budget - Assets[ap_index]
 
-                        val =utility(prim, res,c,l,age_index)+ beta*val_func_t[ap_index,zp_index,age_index+1]
-                        if val > val_func_t[a_index,z_index,age_index]   ##Conduct the same progressions as above. Updating the value function if a level of saving produces higher continuation value than the previous
-                            val_func_t[a_index,z_index, age_index] = val ##level of saving
-                            pol_func_t[a_index,:, age_index] .= Assets[ap_index]  ##we update our saving function
-                            lab_func_t[a_index,:, age_index] .= zero(UInt32) #We dont work
+                        val =utility(prim, res,c,l,age_index)+ beta*val_func_t[ap_index,zp_index,age_index+1,t+1]
+                        if val > val_func_t[a_index,z_index,age_index,t]   ##Conduct the same progressions as above. Updating the value function if a level of saving produces higher continuation value than the previous
+                            val_func_t[a_index,z_index, age_index,t] = val ##level of saving
+                            pol_func_t[a_index,:, age_index,t] .= Assets[ap_index]  ##we update our saving function
+                            lab_func_t[a_index,:, age_index,t] .= zero(UInt32) #We dont work
                              ##Add the value function over all asset levels for those in the final period of life.
                         end
 
@@ -212,18 +197,18 @@ function bellman_t(prim::Primitives,res::Results,res2::new_primitives)  #Functio
                     # res.v_final[:,:,age_index] .= val
             #else age_index < 46
         else age_index < 46  ##the problem for workers
-                    val_func_t[a_index,z_index, age_index] = -Inf
+                    val_func_t[a_index,z_index, age_index,t] = -Inf
                 #for a_index = 1:na, z_index = 1:nz
                     for ap_index = 1:na
-                        l = labor(prim,res,age_index,a_index,ap_index,z_index)
+                        l = labor_t(prim,res,res2,age_index,a_index,ap_index,z_index,theta,t)
 
                         budget = (1+r_t[t])*Assets[a_index] + w_t[t]*(1-theta[t])*produc[age_index,z_index]*l  ##Our state is now very important
                         c = budget - Assets[ap_index]
-                        val = utility(prim, res,c,l,age_index) .+ beta.*(val_func_t[ap_index,1,age_index+1].*markov[z_index,1]+val_func_t[ap_index,2,age_index+1].*markov[z_index,2]) ##value function now heavily impacted by expectation over future productivity states
-                        if val > val_func_t[a_index,z_index,age_index] #Same progression as before
-                            val_func_t[a_index,z_index, age_index] = val
-                            pol_func_t[a_index,z_index,age_index] = Assets[ap_index] #Update our saving
-                            lab_func_t[a_index,z_index,age_index] = l ##Now we have to set our
+                        val = utility(prim, res,c,l,age_index) .+ beta.*(val_func_t[ap_index,1,age_index+1,t+1].*markov[z_index,1]+val_func_t[ap_index,2,age_index+1,t+1].*markov[z_index,2]) ##value function now heavily impacted by expectation over future productivity states
+                        if val > val_func_t[a_index,z_index,age_index,t] #Same progression as before
+                            val_func_t[a_index,z_index, age_index,t] = val
+                            pol_func_t[a_index,z_index,age_index,t] = Assets[ap_index] #Update our saving
+                            lab_func_t[a_index,z_index,age_index,t] = l ##Now we have to set our
                             ##Add the value function over all asset levels for those in the final period of life.
                         end
                     end
@@ -237,10 +222,10 @@ function bellman_t(prim::Primitives,res::Results,res2::new_primitives)  #Functio
     end
 end
 
-function labor_t(prim::Primitives,res::Results,age_index,a_index,ap_index,z_index,t::Int64)  ##Optimal Labor Supply function
-    @unpack theta, gamma, produc,Assets = prim
+function labor_t(prim::Primitives,res::Results,res2::new_primitives,age_index,a_index,ap_index,z_index,theta,t::Int64)  ##Optimal Labor Supply function
+    @unpack gamma, produc,Assets = prim
     @unpack w_t,r_t,b_t = res2
-    l::Float64 = (gamma*(1-theta[t])*produc[age_index,z_index]*w_t[t]-(1-gamma)*((1+r_t[t])*Assets[a_index]-Assets[ap_index]))/((1-theta[t])*w_t[t]*produc[age_index, z_index]) ##Optimal Endogenous labor supply, including depreciation
+    l  = (gamma*(1-theta[t])*produc[age_index,z_index]*w_t[t]-(1-gamma)*((1+r_t[t])*Assets[a_index]-Assets[ap_index]))/((1-theta[t])*w_t[t]*produc[age_index, z_index]) ##Optimal Endogenous labor supply, including depreciation
     if l < 0
         l = 0
     elseif l > 1
@@ -249,8 +234,8 @@ function labor_t(prim::Primitives,res::Results,age_index,a_index,ap_index,z_inde
     l
 end
 
-function agg_K_t(prim::Primitives,res2::new_primitives,res::Results,K_0)
-    @unpack T,sav_func_t,F_t =res2
+function agg_K_t(prim::Primitives,res2::new_primitives,res::Results,K_0,T)
+    @unpack sav_func_t,F_t =res2
     @unpack N, na, nz, Assets = prim
 
    K_potential = zeros(T)
@@ -288,9 +273,9 @@ end
 
 res2.K_potential = agg_L_t(prim,res2,res,K_0)
 
-function agg_L_t(prim::Primitives,res2::new_primitives,res::Results,0_0)
-    @unpack T,sav_func_t,F_t,lab_func_t =res2
-    @unpack N, na, nz, Assets = prim
+function agg_L_t(prim::Primitives,res2::new_primitives,res::Results,L_0,T)
+    @unpack sav_func_t,F_t,lab_func_t =res2
+    @unpack N, na, nz, Assets, produc = prim
 
    L_potential = zeros(T)
    L_potential[1] = L_0
@@ -318,17 +303,17 @@ function agg_L_t(prim::Primitives,res2::new_primitives,res::Results,0_0)
     return  L_potential
 end
 
-function KL_update2(prim::Primitives,res2::new_primitives, pop_normal,K_t1,L_t1, lam,F_0) #Marking part of the loop a function
+function KL_update2(prim::Primitives,res2::new_primitives,K_t1,L_t1, lam,F_0,T) #Marking part of the loop a function
     @unpack alpha, theta, age_retire, N, delta,na,nz = prim
     @unpack K_t, L_t, theta = res2
-    retired_mass = sum(pop_normal[age_retire:N])
+    # retired_mass = sum(pop_normal[age_retire:N])
     K_tnew = lam .* K_t1 .+ (1 - lam) .* K_t
     L_tnew=  lam .* L_t1 .+ (1 - lam) .* L_t
-    F_tnew = zeros(na,na,N,Y)
+    F_tnew = zeros(na,nz,N,T)
     F_tnew[:,:,:,1] = F_0
     w_tnew = ((1-alpha).*(K_tnew.^(alpha)))./(L_tnew.^(alpha))
-    r_tnew = (alpha.*(L_tnew.^(1.-alpha)))./(K_tnew^(1-.alpha)) .- delta
-    b_tnew = (theta.*w_tnew.*L_tnew)./retired_mass
+    r_tnew = (alpha.*(L_tnew.^(1 .- alpha)))./(K_tnew.^(1 .- alpha)) .- delta
+    b_tnew = (theta.*w_tnew.*L_tnew)./sum(F_tnew[:,:,age_retire:N,1])
     res2.K_t = K_tnew
     res2.L_t = L_tnew
     res2.F_t = F_tnew
@@ -345,31 +330,31 @@ end
 
 
 ###Now We Compute the Transition Path
-function overall_solve(prim::Primitives,res::Results,res2::new_primitives,t::Int64)
+function overall_solve(prim::Primitives,res::Results,t::Int64,T::Int64)
         @unpack alpha, delta, age_retire, N, na,nz = prim
         T_delta = 20
         # T = 30
         tol = 0.01
-        i =
+        i = 0
         lambda = 0.5
-        res2= Initialize2(t)
+        res2 = Initialize2(T,t)
         while true
             while true
                 i += 1
                 println("***********************************")
                 println("Trial #", i)
-                res2.val_func_t, res2.pol_func_t, res2.lab_func_t = bellman_t(prim, res, path, T)
-                res2.F_t = Fdist_t(prim, res, res2, F_0,F_n)
-                K_t1 = agg_K_t(prim,res2,res,K_0)
-                L_t1 = agg_L_t(prim,res2,res,L_0)
+                res2.val_func_t, res2.pol_func_t, res2.lab_func_t = bellman_t(prim, res, res2, T)
+                res2.F_t = Fdist_t(prim, res2, res, F_0,F_n)
+                K_t1 = agg_K_t(prim,res2,res,K_0,T)
+                L_t1 = agg_L_t(prim,res2,res,L_0,T)
                 display(plot([res2.K_t K_t1 repeat([K_0], T) repeat([K_n], T)],
                          label = ["K Guess" "K Path" "Stationary K w/ SS" "Stationary K w/o SS"],
                          title = "Capital Transition Path", legend = :bottomright))
                 diff = maximum(abs.(res2.K_t .- K_t1)./K_t1) + maximum(abs.(res2.L_t .- L_t1)./L_t1)
-                @printf("Difference: %0.3f.", float(diff))
+                # @printf("Difference: %0.3f.", float(diff))
                 println("")
-                if dist > tol
-                    KL_update2(prim,res,pop_normal,K_t1,L_t1,lambda,F_0)
+                if diff > tol
+                    KL_update2(prim,res2,K_t1,L_t1,lambda,F_0,T)
                     println("Paths Adjusted")
                 else
                     println("Paths Converged")
@@ -389,7 +374,7 @@ function overall_solve(prim::Primitives,res::Results,res2::new_primitives,t::Int
         res2, T
 end
 
-
+elapse = @elapsed res2, T = overall_solve(prim, res,1, 30)
 
 
 
@@ -435,24 +420,3 @@ end
 
 end
 b
-
-
-## Equivalent Variation and Vote Share
-
-function EV(prim::Primitives, res2::Results)
-    @unpack N, na, nz, alpha, lam = prim
-    ev = zeros(N, na, nz)
-    ev = (res2.val_func_path[:, :, :, 1] ./ val_func_n).^(1/(lam * (1 - alpha)))
-    ev_cf = (val_func_0./ val_func_n).^(1/(lam * (1 - alpha)))
-    evj = zeros(N)
-    evj_cf = zeros(N)
-    for j=1:N
-        evj[j] = sum(EV[j, :, :] .* F_n[j, :, :]) ./ sum(F_n[j, :, :])
-        evj_cf[j] = sum(ev_cf[j, :, :] .* F_n[j, :, :]) ./ sum(F_n[j, :, :])
-    end
-    evj, evj_cf, ev, ev_cf
-end
-
-# function Vote_share(EV::Array{Float64})
-    
-# end
