@@ -10,8 +10,8 @@ val_func_n, pol_func_n,lab_func_n, K_n, L_n, r_n, w_n, b_n, F_n = Run_all(prim_2
 
 
 mutable struct new_primitives
-    T_delta::Float64
-    l_delta::Float64
+    #T_delta::Float64
+    #l_delta::Float64
     K_t::Array{Float64,1}
     K_potential::Array{Float64,1}
     L_t::Array{Float64,1}
@@ -21,8 +21,8 @@ mutable struct new_primitives
     lab_func_t::Array{Float64,4}
     pol_func_t::Array{Float64,4}
     F_t::Array{Float64,4}
-    T::Int64
-    T_array::Array{Int64,1}
+    #T::Int64
+    #T_array::Array{Int64,1}
     pop_normal::Array{Float64,1}
     Assets::Array{Float64,4}
     w_t::Array{Float64, 1}                                                    # transition path of wage
@@ -32,12 +32,12 @@ mutable struct new_primitives
 end
 
 
-function Initialize2(T::Int64,t_iter::Int64)
+function Initialize2(T,t_iter)
     #T = 30
     #t_iter = 1
-    T_array = collect(range(1,length=30,stop=T))
-    T_delta = (K_n - K_0 )/prim.T
-    l_delta = (L_n - L_0)/prim.T
+    #T_array = collect(range(1,length=30,stop=T))
+    #T_delta = (K_n - K_0 )/prim.T
+    #l_delta = (L_n - L_0)/prim.T
     K_t = collect(range(K_0, stop =K_n, length = T))
     K_potential = zeros(T)
     L_t = collect(range(L_0, stop = L_n, length = T))
@@ -55,12 +55,12 @@ function Initialize2(T::Int64,t_iter::Int64)
     w_t = ((1-prim.alpha).*(K_t.^(prim.alpha)))./(L_t.^(prim.alpha))
     b_t = (prim.theta.*w_t.*L_t)./sum(F_t[:,:,prim.age_retire:prim.N,1])
     theta = [repeat([0.11], t_iter); repeat([0.0], T-t_iter)]
-    res2 = new_primitives(T_delta,l_delta, K_t, K_potential, L_t,sav_func_t,val_func_t,lab_func_t, pol_func_t,F_t,T,T_array,pop_normal,Assets,w_t,r_t,b_t,theta)
+    res2 = new_primitives(K_t, K_potential, L_t,sav_func_t,val_func_t,lab_func_t, pol_func_t,F_t,pop_normal,Assets,w_t,r_t,b_t,theta)
     res2
 
 
 end
-res2 = Initialize2()
+# res2 = Initialize2()
 
 
 
@@ -169,12 +169,12 @@ function bellman_t(prim::Primitives,res::Results,res2::new_primitives,T)  #Funct
 end
 
 
-function Fdist_t(prim::Primitives,res2::new_primitives,res::Results,F_0,F_n)
+function Fdist_t(prim::Primitives,res2::new_primitives,res::Results,F_0,F_n,T)
 
 
     @unpack na,nz,markov,N,Assets,n = prim
     @unpack F = res
-    @unpack T = res2
+    #@unpack T = res2
     F_next= zeros(na,nz,N,T)
     F_next[:,:,:,1] = F_0
     for t_index = 2:T
@@ -208,8 +208,8 @@ function Fdist_t(prim::Primitives,res2::new_primitives,res::Results,F_0,F_n)
 
 end
 
-res2.F_t = Fdist_t(prim,res2,res,F_0,F_n)
-function labor_t(prim::Primitives,res::Results,res2::new_primitives,age_index,a_index,ap_index,z_index,theta,t::Int64)  ##Optimal Labor Supply function
+# res2.F_t = Fdist_t(prim,res2,res,F_0,F_n)
+function labor_t(prim::Primitives,res::Results,res2::new_primitives,age_index,a_index,ap_index,z_index,theta,t)  ##Optimal Labor Supply function
     @unpack gamma, produc,Assets = prim
     @unpack w_t,r_t,b_t = res2
     l  = (gamma*(1-theta[t])*produc[age_index,z_index]*w_t[t]-(1-gamma)*((1+r_t[t])*Assets[a_index]-Assets[ap_index]))/((1-theta[t])*w_t[t]*produc[age_index, z_index]) ##Optimal Endogenous labor supply, including depreciation
@@ -282,8 +282,8 @@ function new_equilibrium(prim::Primitives,res2::new_primitives,res::Results,K_0)
 
 end
 
-res2.K_potential = new_equilibrium(prim,res2,res,K_0)
-res2.K_potential = agg_L_t(prim,res2,res,K_0)
+# res2.K_potential = new_equilibrium(prim,res2,res,K_0)
+# res2.K_potential = agg_L_t(prim,res2,res,K_0)
 
 function agg_L_t(prim::Primitives,res2::new_primitives,res::Results,L_0,T)
     @unpack sav_func_t,F_t,lab_func_t =res2
@@ -342,7 +342,7 @@ end
 
 
 ###Now We Compute the Transition Path
-function overall_solve(prim::Primitives,res::Results,t::Int64,T::Int64)
+function overall_solve(prim::Primitives,res::Results,t,T)
         @unpack alpha, delta, age_retire, N, na,nz = prim
         T_delta = 20
         # T = 30
@@ -356,7 +356,7 @@ function overall_solve(prim::Primitives,res::Results,t::Int64,T::Int64)
                 println("***********************************")
                 println("Trial #", i)
                 res2.val_func_t, res2.pol_func_t, res2.lab_func_t = bellman_t(prim, res, res2, T)
-                res2.F_t = Fdist_t(prim, res2, res, F_0,F_n)
+                res2.F_t = Fdist_t(prim, res2, res, F_0,F_n,T)
                 K_t1 = agg_K_t(prim,res2,res,K_0,T)
                 L_t1 = agg_L_t(prim,res2,res,L_0,T)
                 display(plot([res2.K_t K_t1 repeat([K_0], T) repeat([K_n], T)],
@@ -416,17 +416,17 @@ end
 elapse = @elapsed res2, T = overall_solve(prim, res,1, 30)
 
 
-function EV(prim::Primitives, res2::Results,lam::Float64 = .01)
-    @unpack N, na, nz, alpha = prim
-    ev = zeros(N, na, nz)
-    evj = zeros(N)
-
-    ev = (res2.val_func[:, :, :, 1] ./ val_func_n).^(1/(lam .* (1 - alpha)))
-    ev_cf = (val_func_0./ val_func_n).^(1/(lam .* (1 - alpha)))
-    evj_cf = zeros(N)
-    for j=1:N
-        evj[j] = sum(ev[j, :, :] .* F_n[j, :, :]) ./ sum(F_n[j, :, :])
-        evj_cf[j] = sum(ev_cf[j, :, :] .* F_n[j, :, :]) ./ sum(F_n[j, :, :])
-    end
-    evj, evj_cf, ev, ev_cf
-end
+# function EV(prim::Primitives, res2::Results,lam::Float64 = .01)
+#     @unpack N, na, nz, alpha = prim
+#     ev = zeros(N, na, nz)
+#     evj = zeros(N)
+#
+#     ev = (res2.val_func[:, :, :, 1] ./ val_func_n).^(1/(lam .* (1 - alpha)))
+#     ev_cf = (val_func_0./ val_func_n).^(1/(lam .* (1 - alpha)))
+#     evj_cf = zeros(N)
+#     for j=1:N
+#         evj[j] = sum(ev[j, :, :] .* F_n[j, :, :]) ./ sum(F_n[j, :, :])
+#         evj_cf[j] = sum(ev_cf[j, :, :] .* F_n[j, :, :]) ./ sum(F_n[j, :, :])
+#     end
+#     evj, evj_cf, ev, ev_cf
+# end
