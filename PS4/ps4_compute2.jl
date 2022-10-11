@@ -102,7 +102,7 @@ function shoot_backward(prim::Primitives,res2)
 
 
     end
-    return res2.val_func_t, res2.pol_func_t, res2.lab_func_t, res2.K_t, res2.sav_func_t,res2.pop_normal
+    return res2.pop_normal # return res2.val_func_t, res2.pol_func_t, res2.lab_func_t, res2.K_t, res2.sav_func_t,res2.pop_normal
 end
 res2.val_func_t, res2.pol_func_t, res2.lab_func_t, res2.K_t, res2.sav_func_t,res2.pop_normal = shoot_backward(prim,res2)
 
@@ -249,8 +249,8 @@ function labor_t(prim::Primitives,res::Results,res2::new_primitives,age_index,a_
     l
 end
 
-function agg_K_t(prim::Primitives,res2::new_primitives,res::Results,K_0)
-    @unpack T,sav_func_t,F_t =res2
+function agg_K_t(prim::Primitives,res2::new_primitives,res::Results,K_0,T)
+    @unpack sav_func_t,F_t =res2
     @unpack N, na, nz, Assets = prim
 
    K_potential = zeros(T)
@@ -288,9 +288,9 @@ end
 
 res2.K_potential = agg_L_t(prim,res2,res,K_0)
 
-function agg_L_t(prim::Primitives,res2::new_primitives,res::Results,0_0)
-    @unpack T,sav_func_t,F_t,lab_func_t =res2
-    @unpack N, na, nz, Assets = prim
+function agg_L_t(prim::Primitives,res2::new_primitives,res::Results,L_0,T)
+    @unpack sav_func_t,F_t,lab_func_t =res2
+    @unpack N, na, nz, Assets, produc = prim
 
    L_potential = zeros(T)
    L_potential[1] = L_0
@@ -318,17 +318,17 @@ function agg_L_t(prim::Primitives,res2::new_primitives,res::Results,0_0)
     return  L_potential
 end
 
-function KL_update2(prim::Primitives,res2::new_primitives, pop_normal,K_t1,L_t1, lam,F_0) #Marking part of the loop a function
+function KL_update2(prim::Primitives,res2::new_primitives,K_t1,L_t1, lam,F_0,T) #Marking part of the loop a function
     @unpack alpha, theta, age_retire, N, delta,na,nz = prim
     @unpack K_t, L_t, theta = res2
-    retired_mass = sum(pop_normal[age_retire:N])
+    # retired_mass = sum(pop_normal[age_retire:N])
     K_tnew = lam .* K_t1 .+ (1 - lam) .* K_t
     L_tnew=  lam .* L_t1 .+ (1 - lam) .* L_t
-    F_tnew = zeros(na,na,N,Y)
+    F_tnew = zeros(na,nz,N,T)
     F_tnew[:,:,:,1] = F_0
     w_tnew = ((1-alpha).*(K_tnew.^(alpha)))./(L_tnew.^(alpha))
-    r_tnew = (alpha.*(L_tnew.^(1.-alpha)))./(K_tnew^(1-.alpha)) .- delta
-    b_tnew = (theta.*w_tnew.*L_tnew)./retired_mass
+    r_tnew = (alpha.*(L_tnew.^(1 .- alpha)))./(K_tnew.^(1 .- alpha)) .- delta
+    b_tnew = (theta.*w_tnew.*L_tnew)./sum(F_tnew[:,:,age_retire:N,1])
     res2.K_t = K_tnew
     res2.L_t = L_tnew
     res2.F_t = F_tnew
@@ -359,17 +359,17 @@ function overall_solve(prim::Primitives,res::Results,t::Int64,T::Int64)
                 println("***********************************")
                 println("Trial #", i)
                 res2.val_func_t, res2.pol_func_t, res2.lab_func_t = bellman_t(prim, res, res2, T)
-                res2.F_t = Fdist_t(prim, res, res2, F_0,F_n)
-                K_t1 = agg_K_t(prim,res2,res,K_0)
-                L_t1 = agg_L_t(prim,res2,res,L_0)
+                res2.F_t = Fdist_t(prim, res2, res, F_0,F_n)
+                K_t1 = agg_K_t(prim,res2,res,K_0,T)
+                L_t1 = agg_L_t(prim,res2,res,L_0,T)
                 display(plot([res2.K_t K_t1 repeat([K_0], T) repeat([K_n], T)],
                          label = ["K Guess" "K Path" "Stationary K w/ SS" "Stationary K w/o SS"],
                          title = "Capital Transition Path", legend = :bottomright))
                 diff = maximum(abs.(res2.K_t .- K_t1)./K_t1) + maximum(abs.(res2.L_t .- L_t1)./L_t1)
                 @printf("Difference: %0.3f.", float(diff))
                 println("")
-                if dist > tol
-                    KL_update2(prim,res,pop_normal,K_t1,L_t1,lambda,F_0)
+                if diff > tol
+                    KL_update2(prim,res2,K_t1,L_t1,lambda,F_0,T)
                     println("Paths Adjusted")
                 else
                     println("Paths Converged")
