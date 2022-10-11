@@ -526,3 +526,4 @@ println(" ")
 vote_share2 = sum((ev2.>=1).*F_0)
 vote_share_counterfact2 = sum((ev_cf2.>=1).*F_0)
 diff_vote_share2 = vote_share_counterfact2 - vote_share2
+
