@@ -432,5 +432,97 @@ end
 evj, evj_cf, ev, ev_cf = EV(prim,res,res2,0.42)
 sum((ev.>=1).*F_0)
 
-#(res2.val_func_t[:, :, :, 1] ./ val_func_0).^(1/(lam * (1 - sigma)))
+plot(collect(20:85), [evj[1:66], evj_cf[1:66], repeat([1], 66)], labels = ["With Transition" "Without Transition" "EV = 1"],
+          title = "EV by Age", legend = :bottomleft)
+savefig("exercise1_EV.png")
+println("Average welfare effect within each age cohorts are saved.")
+println(" ")
+vote_share = sum((ev.>=1).*F_0)
+vote_share_counterfact = sum((ev_cf.>=1).*F_0)
+diff_vote_share = vote_share_counterfact - vote_share
 
+
+function overall_solve2(prim::Primitives,res::Results,t,T)
+        @unpack alpha, delta, age_retire, N, na,nz = prim
+        T_delta = 20
+        # T = 30
+        tol = 0.01
+        i = 0
+        lambda = 0.5
+        res2 = Initialize2(T,t)
+        while true
+            while true
+                i += 1
+                println("***********************************")
+                println("Trial #", i)
+                res2.val_func_t, res2.pol_func_t, res2.lab_func_t = bellman_t(prim, res, res2, T)
+                res2.F_t = Fdist_t(prim, res2, res, F_0,F_n,T)
+                K_t1 = agg_K_t(prim,res2,res,K_0,T)
+                L_t1 = agg_L_t(prim,res2,res,L_0,T)
+                display(plot([res2.K_t K_t1 repeat([K_0], T) repeat([K_n], T)],
+                         label = ["K Guess" "K Path" "Stationary K w/ SS" "Stationary K w/o SS"],
+                         title = "Capital Transition Path", legend = :bottomright))
+                diff = maximum(abs.(res2.K_t .- K_t1)./K_t1) + maximum(abs.(res2.L_t .- L_t1)./L_t1)
+                # @printf("Difference: %0.3f.", float(diff))
+                println("")
+                if diff > tol
+                    KL_update2(prim,res2,K_t1,L_t1,lambda,F_0,T)
+                    println("Paths Adjusted")
+                else
+                    println("Paths Converged")
+                    display(plot([res2.K_t K_t1 repeat([K_0], T) repeat([K_n], T)],
+                             label = ["K Guess" "K Path" "Stationary K w/ SS" "Stationary K w/o SS"],
+                             title = "Capital Transition Path", legend = :bottomright))
+                    savefig("exercise2_aggregate_capital_path.png")
+                    println("Aggregate capital path is saved.")
+                    println(" ")
+                    plot(collect(1:T), [res2.w_t repeat([w_0], T) repeat([w_n], T)],
+                      label = ["Wage path" "Stationary wage w/ SS" "Stationary wage w/o SS"],
+                      title = "Wage Transition Path", legend = :bottomright)
+                      savefig("exercise2_wage_path.png")
+                      println("Wage path is saved.")
+                      println(" ")
+                     plot(collect(1:1:T), [res2.L_t repeat([L_0], T) repeat([L_n], T)],
+                         label = ["Aggregate labor path" "Stationary labor w/ SS" "Stationary labor w/o SS"],
+                        title = "Labor Transition Path", legend = :bottomright)
+                        savefig("exercise2_aggregate_labor_path.png")
+                        println("Aggregate labor path is saved.")
+                        println(" ")
+                    plot(collect(1:T), [res2.r_t repeat([r_0], T) repeat([r_n], T)],
+                         label = ["Interest rate path" "Stationary rate w/ SS" "Stationary rate w/o SS"],
+                         title = "Interest Rate Transition Path", legend = :bottomright)
+                        savefig("exercise2_interest_rate_path.png")
+                        println("Interest rate path is saved.")
+                        println(" ")
+
+
+
+                    break
+                end
+            end
+            error = abs(res2.K_t[T] - K_n)/K_n
+            if error > tol
+                T += T_delta
+                println("Length Increased")
+                res2 = Initialize2(T,t)
+            else
+                println("Iteration Done")
+                break
+            end
+        end
+        res2, T
+end
+
+elapse = @elapsed res2_2, T_2 = overall_solve2(prim, res,20, 50)
+
+evj, evj_cf, ev, ev_cf = EV(prim,res,res2,0.42)
+sum((ev.>=1).*F_0)
+
+plot(collect(20:85), [evj[1:66], evj_cf[1:66], repeat([1], 66)], labels = ["With Transition" "Without Transition" "EV = 1"],
+          title = "EV by Age", legend = :bottomleft)
+savefig("exercise2_EV.png")
+println("Average welfare effect within each age cohorts are saved.")
+println(" ")
+vote_share2 = sum((ev.>=1).*F_0)
+vote_share_counterfact2 = sum((ev_cf.>=1).*F_0)
+diff_vote_share2 = vote_share_counterfact2 - vote_share2
