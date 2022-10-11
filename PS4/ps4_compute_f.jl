@@ -515,14 +515,14 @@ end
 
 elapse = @elapsed res2_2, T_2 = overall_solve2(prim, res,20, 50)
 
-evj, evj_cf, ev, ev_cf = EV(prim,res,res2,0.42)
-sum((ev.>=1).*F_0)
+evj2, evj_cf2, ev2, ev_cf2 = EV(prim,res,res2_2,0.42)
+sum((ev2.>=1).*F_0)
 
-plot(collect(20:85), [evj[1:66], evj_cf[1:66], repeat([1], 66)], labels = ["With Transition" "Without Transition" "EV = 1"],
+plot(collect(20:85), [evj2[1:66], evj_cf2[1:66], repeat([1], 66)], labels = ["With Transition" "Without Transition" "EV = 1"],
           title = "EV by Age", legend = :bottomleft)
 savefig("exercise2_EV.png")
 println("Average welfare effect within each age cohorts are saved.")
 println(" ")
-vote_share2 = sum((ev.>=1).*F_0)
-vote_share_counterfact2 = sum((ev_cf.>=1).*F_0)
+vote_share2 = sum((ev2.>=1).*F_0)
+vote_share_counterfact2 = sum((ev_cf2.>=1).*F_0)
 diff_vote_share2 = vote_share_counterfact2 - vote_share2
