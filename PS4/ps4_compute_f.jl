@@ -32,9 +32,9 @@ mutable struct new_primitives
 end
 
 
-function Initialize2()#T::Int64,t_iter::Int64)
-    T = 30
-    t_iter = 1
+function Initialize2(T::Int64,t_iter::Int64)
+    #T = 30
+    #t_iter = 1
     T_array = collect(range(1,length=30,stop=T))
     T_delta = (K_n - K_0 )/prim.T
     l_delta = (L_n - L_0)/prim.T
@@ -370,10 +370,37 @@ function overall_solve(prim::Primitives,res::Results,t::Int64,T::Int64)
                     println("Paths Adjusted")
                 else
                     println("Paths Converged")
+                    display(plot([res2.K_t K_t1 repeat([K_0], T) repeat([K_n], T)],
+                             label = ["K Guess" "K Path" "Stationary K w/ SS" "Stationary K w/o SS"],
+                             title = "Capital Transition Path", legend = :bottomright))
+                    savefig("exercise1_aggregate_capital_path.png")
+                    println("Aggregate capital path is saved.")
+                    println(" ")
+                    plot(collect(1:T), [res2.w_t repeat([w_0], T) repeat([w_n], T)],
+                      label = ["Wage path" "Stationary wage w/ SS" "Stationary wage w/o SS"],
+                      title = "Wage Transition Path", legend = :bottomright)
+                      savefig("exercise1_wage_path.png")
+                      println("Wage path is saved.")
+                      println(" ")
+                     plot(collect(1:1:T), [res2.L_t repeat([L_0], T) repeat([L_n], T)],
+                         label = ["Aggregate labor path" "Stationary labor w/ SS" "Stationary labor w/o SS"],
+                        title = "Labor Transition Path", legend = :bottomright)
+                        savefig("exercise1_aggregate_labor_path.png")
+                        println("Aggregate labor path is saved.")
+                        println(" ")
+                    plot(collect(1:T), [res2.r_t repeat([r_0], T) repeat([r_n], T)],
+                         label = ["Interest rate path" "Stationary rate w/ SS" "Stationary rate w/o SS"],
+                         title = "Interest Rate Transition Path", legend = :bottomright)
+                        savefig("exercise1_interest_rate_path.png")
+                        println("Interest rate path is saved.")
+                        println(" ")
+
+
+
                     break
                 end
             end
-            error = abs(res2.K_t-K_n)/K_n
+            error = abs(res2.K_t[T] - K_n)/K_n
             if error > tol
                 T += T_delta
                 println("Length Increased")
