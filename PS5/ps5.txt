@@ -1,0 +1,94 @@
+1. random.seed()
+agg_state z
+idio_state ep
+
+
+we want drawshocks to return ep and z
+
+bellman equation:
+conducts interpolation
+install package
+install optim
+
+Good state 1, bad state 2
+returns a policy function and a value function
+3rd function getindex
+
+
+Model:
+1.Simulate Capital Path
+2. Estimate Regression
+3. Make Updates
+
+Jacob Has
+Part of an initialize function for mutable structure
+simulate capital path returns 2 matrices (step5)
+
+input policy function, epsilon(idiosyncratic), z(aggregate shocks)
+epsilon nXT, n is 5000, t 11000.
+z is tx1 vector, aggregate shock for each time period
+
+What jacob thinks from here(gets confusing)
+Kappa is T-1 X 3 Matrix
+
+t -n 2:T-1 Conduct value function iteration. 
+
+Then generate kappa same way as before
+V is the panel of states and future capital decisions
+use getindex within the policy function
+
+
+By getting rid of 1000 periods we get rid of state dependence?
+first 1000 
+99999 afterwards
+jacobs assumption: bellman has all budget constraints done correctly 
+
+
+6: regression, estimate parameters 
+must separate into average cap decisions in bad vs good state
+this is done by the statesort function
+
+
+creates 2 separate vectors for y and x
+runs through all options
+if good state appends y with capital choice for that period and x with the capital in that period
+if not a good state, throws into the bad version
+
+4 lists now
+checks length of lists
+then does hcat, horziontal concatenization , putting columns together
+
+puts y first then x
+be careful not to mix up with the regression
+regression
+regression checks if we want to have a constant
+
+checks length of x
+sticks a vector of ones in front of x
+converts x and y into logs 
+
+in belmman 225 we exponentiate in order to avoid having in logs
+should be how linear regression is done
+
+lots gets spit out
+intercept, coefficent r^2
+
+then theres a function that estimates regression, just put kappa in there
+spits out 4 coefficients and vector or r^2s
+
+
+7 updates coefficiens since coeffs part of bellman 
+and we want the coefficients to converge
+draws shocks, initializes coefficients, runs bellman, simulate capital path usinfg pol func
+estimate regression using simulate capital path 
+check if things have converged 
+if not update coeffs 
+if they have then print out goodness of fit
+check goodness of fit, if not high enough change moments
+
+new frontier
+
+
+
+
+
