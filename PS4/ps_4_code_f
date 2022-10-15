@@ -1,7 +1,7 @@
-
+ 
 #Problem Set 3 Code
 
-using Plots, Parameters, Accessors
+using Plots, Parameters, Setfield
 @with_kw struct Primitives
     age_retire::Int64 = 46
     theta::Float64 = 0.11
@@ -14,7 +14,7 @@ using Plots, Parameters, Accessors
     delta::Float64 = 0.06 #Capital Depreciation
     beta::Float64 = 0.97
     N::Int64 = 66
-    Assets::Array{Float64,1} = collect(range(0,length=1000,stop=30)) ##made it shorter for now while bug testing, each step in .0375
+    Assets::Array{Float64,1} = collect(range(0,length=250,stop=30)) ##made it shorter for now while bug testing, each step in .0375
     na::Int64 = length(Assets)
     nz::Int64 = length(z_prod)
     age_ef::Array{Float64,1} = [0.59923239,0.63885106, .67846973,
@@ -36,8 +36,11 @@ using Plots, Parameters, Accessors
        1.0363000,
        1.0200000,
        1.0110000]
-    produc = age_ef * z_prod' ##Productivity at different life stages
+    produc::Array{Float64,2} = age_ef * z_prod' ##Productivity at different life stages
     n::Float64 = .011
+    T::Int64 = 30
+    t_Array::Array{Float64,1} = collect(range(0,length=30,stop=30))                                                                 #Guessing a certain amount of time for transition
+                                                             ##Setting the amount of time for transition
 ##Make a matrix
 
 end
@@ -64,6 +67,8 @@ mutable struct Results
     L_new:: Array{Float64,3}
     welf:: Float64
     CV:: Float64
+
+    #T_delta::Float64 = (K_n - K_0 )/T   #Transitiondelta
 end
 
 function Initialize()
@@ -81,10 +86,12 @@ function Initialize()
     L = 0.3
     K1 = 0 #doesn't really matter, get filled in later
     L1 = 0  #doesn't really matter, gets filled in later
+    T = 30  ##Initital guess for the amount of time for transition to take place
     K_new = zeros(prim.na,prim.nz,prim.N)
     L_new = zeros(prim.na,prim.nz,prim.age_retire-1)
     welf = 0.0
     CV = 0.0
+    K_t =
     res = Results(pol_func,val_func, lab_func,age_j, r,w,b,F, K, L, K1, L1, K_new, L_new, welf, CV)
     prim, res
 end
@@ -92,7 +99,7 @@ end
 function labor(prim::Primitives,res::Results,age_index,a_index,ap_index,z_index)  ##Optimal Labor Supply function
     @unpack theta, gamma, produc,Assets = prim
     @unpack w,r = res
-    l = (gamma*(1-theta)*produc[age_index,z_index]*w-(1-gamma)*((1+r)*Assets[a_index]-Assets[ap_index]))/((1-theta)*w*produc[age_index, z_index]) ##Optimal Endogenous labor supply, including depreciation
+    l::Float64 = (gamma*(1-theta)*produc[age_index,z_index]*w-(1-gamma)*((1+r)*Assets[a_index]-Assets[ap_index]))/((1-theta)*w*produc[age_index, z_index]) ##Optimal Endogenous labor supply, including depreciation
     if l < 0
         l = 0
     elseif l > 1
@@ -103,7 +110,7 @@ end
 
 function utility(prim::Primitives, res::Results, c, l,age_index)  ##Utility functions
     @unpack sigma, gamma = prim
-    u = -Inf
+    u::Float64 = -Inf
     if  age_index > 45  ##Utility functions for retired population
         if c>0
             u = (c^((1-sigma) * gamma))/(1 - sigma)
@@ -129,17 +136,17 @@ function Backinduct(prim::Primitives,res::Results)  #Function to iterate backwar
     # L = 0.3 #######
     # v_0=1e-10
     for age_index = 66:-1:1
-        #println("Age: ", age_index)
+        println("Age: ", age_index)
         #if age_index == 66
         for a_index = 1:na, z_index=1:nz #Iterate over potential asset holdings
 
             #for a_index = 1:na, z_index=1:nz
             if age_index == 66   ##The problem for those in the last period of life
                 res.val_func[a_index,z_index, age_index] = -Inf #Set a very low initial guess for value function
-                budget = (1+r)*Assets[a_index] + b #
-                c = budget
-                l = 0
-                val = utility(prim, res,c,l,age_index) #Our value function in the last period of life involves no saving
+                budget::Float64 = (1+r)*Assets[a_index] + b #
+                c::Float64 = budget
+                l::Float64 = 0
+                val::Float64 = utility(prim, res,c,l,age_index) #Our value function in the last period of life involves no saving
                 #val =  (c^((1-sigma)*gamma))/(1-sigma)
                 if val > res.val_func[a_index,z_index, age_index]   ##Check if our value function is greater than initital guess
                     res.val_func[a_index,z_index,age_index] = val #update value of this value function
@@ -180,7 +187,7 @@ function Backinduct(prim::Primitives,res::Results)  #Function to iterate backwar
 
                     budget = (1+r)*Assets[a_index] + w*(1-theta)*produc[age_index,z_index]*l  ##Our state is now very important
                     c = budget - Assets[ap_index]
-                    val = utility(prim, res,c,l,age_index) + beta*sum(res.val_func[ap_index,:,age_index+1].*markov[z_index,:]) ##value function now heavily impacted by expectation over future productivity states
+                    val = utility(prim, res,c,l,age_index) .+ beta.*(res.val_func[ap_index,1,age_index+1].*markov[z_index,1]+res.val_func[ap_index,2,age_index+1].*markov[z_index,2]) ##value function now heavily impacted by expectation over future productivity states
                     if val > res.val_func[a_index,z_index,age_index] #Same progression as before
                         res.val_func[a_index,z_index, age_index] = val
                         res.pol_func[a_index,z_index,age_index] = Assets[ap_index] #Update our saving
@@ -199,35 +206,36 @@ end
 
 
 
+
 ## graphs for question 1
 prim, res = Initialize()
-res.v_final= zeros(prim.na,prim.nz,prim.N)
+# res.v_final= zeros(prim.na,prim.nz,prim.N)
 @time Backinduct(prim,res)
 
 ##Note, make sure to run Backinduct with the non-endogenous L,K,r,w,b for the plots and question 1
 plot(prim.Assets, res.val_func[:, 1, 50], title="Value Function at age 50", labels = "", legend=:topleft)
-Plots.savefig("C:/Users/mcket/OneDrive/Documents/Fall 2022/ECON899-Computational/899Code/899/ECON899/PS3/PS_03_valfunc_50.png")
+Plots.savefig("PS_03_valfunc_50.png")
 plot(prim.Assets, [res.pol_func[:, 1, 20] res.pol_func[:, 2, 20]], title="Policy Function at age 20", labels = ["High Productivity State" "Low Productivity State"], legend=:topleft)
 plot(prim.Assets, [res.pol_func[:, 1, 20].-prim.Assets res.pol_func[:, 2, 20].-prim.Assets], title="Saving Functions at age 20", labels = ["High Productivity State" "Low Productivity State"], legend=:topright)
-Plots.savefig("C:/Users/mcket/OneDrive/Documents/Fall 2022/ECON899-Computational/899Code/899/ECON899/PS3/PS_03_savefunc_20.png")
+Plots.savefig("PS_03_savefunc_20.png")
 plot(prim.Assets, res.F[:, :, 2], title="Distribution of Assets at Age 2(21)", labels = ["High Productivity State" "Low Productivity State"], legend=:topleft)
-Plots.savefig("C:/Users/mcket/OneDrive/Documents/Fall 2022/ECON899-Computational/899Code/899/ECON899/PS3/PS_03_fdist_1.png")
+Plots.savefig("PS_03_fdist_1.png")
 plot(prim.Assets, res.F[:, :, 50], title="Distribution of Assets at Age 50(70)", labels = ["High Productivity State" "Low Productivity State"], legend=:topleft)
-Plots.savefig("C:/Users/mcket/OneDrive/Documents/Fall 2022/ECON899-Computational/899Code/899/ECON899/PS3/PS_03_fdist_50.png")
+Plots.savefig("PS_03_fdist_50.png")
 
 
  ####################################Question 2
  function Fdist_sum(prim::Primitives,res::Results)  ##Function to calculate distribution
     @unpack N,n,nz,na, Assets, markov=prim
     @unpack F = res
-    F = zeros(na,nz,N) #reinitialization each loops fixes weird distribution being too big problem
-    pop_weights = ones(66) #Initial weights
+    F::Array{Float64,3} = zeros(na,nz,N) #reinitialization each loops fixes weird distribution being too big problem
+    pop_weights::Array{Float64,1} = ones(66) #Initial weights
     #mu = zeros(N,nz)
     for j=1:N-1
         pop_weights[j+1] = pop_weights[j]/(n+1)
     end  ##Instantiate relative population sizes
-    pop_sum = sum(pop_weights)
-    pop_normal = pop_weights/pop_sum #Normalize the population
+    pop_sum::Float64  = sum(pop_weights)
+    pop_normal::Array{Float64,1} = pop_weights/pop_sum #Normalize the population
     F[1,1,1] = .2037 #weights of population with initital productivities
     F[1,2,1] = .7963
     # s=-Inf
@@ -321,8 +329,24 @@ end
 #welfare_fctn(prim,res)
 
 
+function EV(prim::Primitives, res2::Results,lam::Float64 = .01)
+    @unpack N, na, nz, alpha = prim
+    ev = zeros(N, na, nz)
+    evj = zeros(N)
+
+    ev = (res2.val_func[:, :, :, 1] ./ val_func_n).^(1/(lam .* (1 - alpha)))
+    ev_cf = (val_func_0./ val_func_n).^(1/(lam .* (1 - alpha)))
+    evj_cf = zeros(N)
+    for j=1:N
+        evj[j] = sum(ev[j, :, :] .* F_n[j, :, :]) ./ sum(F_n[j, :, :])
+        evj_cf[j] = sum(ev_cf[j, :, :] .* F_n[j, :, :]) ./ sum(F_n[j, :, :])
+    end
+    evj, evj_cf, ev, ev_cf
+end
+
+
 ################
-function Run_all(prim::Primitives,res::Results, tol::Float64 = 1e-3, lam::Float64 = .01, kill::Int64 = 1000)
+function Run_all(prim::Primitives,res::Results, tol::Float64 = .01, lam::Float64 = .01, kill::Int64 = 250)
     res.r = (prim.alpha*(res.L^(1-prim.alpha)))/(res.K^(1-prim.alpha)) - prim.delta
     res.w = ((1-prim.alpha)*(res.K^(prim.alpha)))/(res.L^(prim.alpha))
     retired_mass = 0
@@ -353,90 +377,61 @@ function Run_all(prim::Primitives,res::Results, tol::Float64 = 1e-3, lam::Float6
     println("wages: ", res.w)
     println("b: ", res.b)
     println("Welfare: ", res.welf)
-    println("CV: ", res. CV)
+    println("CV: ", res.CV)
+
+
+    evj, evj_cv, ev, ev_cf  = EV(prim, res)
+    vs = sum((ev.>=1).*F_n)
+    println("Equivalent Variation: ", ev)
+    println("Vote Share: ", vs)
+    return res.val_func, res.pol_func,res.lab_func,res.K, res.L, res.r, res.w, res.b, res.F
 end
+
 
 ###The real test
 #prim, res = Initialize()
 #pop_weights,pop_sum,pop_normal, F =  Fdist_sum(prim,res)
 
 ## Experiment 1
+# function statdistSS(prim::Primitives, res::Results)
+#     println("Experiment 1")
+#     prim, res = Initialize()
+#     elapse = @elapsed val_func_0, K_0, L_0, r_0, w_0, b_0 = Run_all(prim,res, 1e-3, .3)
+#     return val_func_0, K_0, L_0, r_0, w_0, b_0
+# end
+# val_func_0, K_0, L_0, r_0, w_0, b_0 = statdistSS(prim,res)
+# function statdistNSS(prim::Primitives, res::Results)
+#     println("Experiment 2")
+#     prim, res = Initialize()
+#     prim_2 = @set prim.theta = 0
+#     elapse = @elapsed val_func_n, K_n, L_n, r_n, w_n, b_n = Run_all(prim_2,res, 1e-3, .3)
+#     return val_func_n, K_n, L_n, r_n, w_n, b_n
+# end
 
-println("Experiment 1")
-prim, res = Initialize()
-@time Run_all(prim,res, 1e-3, .3)
+# Experiment 3, no risk
+# println("Experiment 3")
+# prim, res = Initialize()
+# prim_3 = @set prim.z_prod = [.5, .5]
+# prim_3 = @set prim_3.produc = prim_3.age_ef * prim_3.z_prod'
+# @time Run_all(prim_3,res, 1e-3, .3)
 
-<<<<<<<
-
-## Experiment 2, theta = 0
-println("Experiment 2")
-prim, res = Initialize()
-prim_2 = @set prim.theta = 0
-@time Run_all(prim_2,res, 1e-3, .3)
-
-## Experiment 3, no risk
-println("Experiment 3")
-prim, res = Initialize()
-prim_3 = @set prim.z_prod = [.5, .5]
-prim_3 = @set prim_3.produc = prim_3.age_ef * prim_3.z_prod'
-@time Run_all(prim_3,res, 1e-3, .3)
-
-## Experiment 4, no risk theta = 0
-println("Experiment 4")
-prim, res = Initialize()
-prim_4 = @set prim.theta = 0
-prim_4 = @set prim_4.z_prod = [.5, .5]
-prim_4 = @set prim_4.produc = prim_4.age_ef * prim_4.z_prod'
-@time Run_all(prim_4,res, 1e-3, .3)
-
-## Experiment 5, exogenous labor
-println("Experiment 5")
-prim, res = Initialize()
-prim_5 = @set prim.gamma = 1
-@time Run_all(prim_5,res, 1e-3, .3)
-
-## Experiment 6, exogenous labor, theta = 0
-println("Experiment 6")
-prim, res = Initialize()
-prim_6 = @set prim.gamma = 1
-prim_6 = @set prim_6.theta = 0
-@time Run_all(prim_6,res, 1e-3, .3)
-
-=======
-
-## Experiment 2, theta = 0
-println("Experiment 2")
-prim, res = Initialize()
-prim_2 = @set prim.theta = 0
-@time Run_all(prim_2,res, 1e-3, .3)
-
-## Experiment 3, no risk
-println("Experiment 3")
-prim, res = Initialize()
-prim_3 = @set prim.z_prod = [.5, .5]
-prim_3 = @set prim_3.produc = prim_3.age_ef * prim_3.z_prod'
-@time Run_all(prim_3,res, 1e-3, .3)
-
-## Experiment 4, no risk theta = 0
-println("Experiment 4")
-prim, res = Initialize()
-prim_4 = @set prim.theta = 0
-prim_4 = @set prim_4.z_prod = [.5, .5]
-prim_4 = @set prim_4.produc = prim_4.age_ef * prim_4.z_prod'
-@time Run_all(prim_4,res, 1e-3, .3)
-
-## Experiment 5, exogenous labor
-println("Experiment 5")
-prim, res = Initialize()
-prim_5 = @set prim.gamma = 1
-@time Run_all(prim_5,res, 1e-3, .3)
-
-## Experiment 6, exogenous labor, theta = 0
-println("Experiment 6")
-prim, res = Initialize()
-prim_6 = @set prim.gamma = 1
-prim_6 = @set prim_6.theta = 0
-@time Run_all(prim_6,res, 1e-3, .3)
-
->>>>>>>
- <<<<< ===== >>>>>>>
+# ## Experiment 4, no risk theta = 0
+# println("Experiment 4")
+# prim, res = Initialize()
+# prim_4 = @set prim.theta = 0
+# prim_4 = @set prim_4.z_prod = [.5, .5]
+# prim_4 = @set prim_4.produc = prim_4.age_ef * prim_4.z_prod'
+# @time Run_all(prim_4,res, 1e-3, .3)
+#
+# ## Experiment 5, exogenous labor
+# println("Experiment 5")
+# prim, res = Initialize()
+# prim_5 = @set prim.gamma = 1
+# @time Run_all(prim_5,res, 1e-3, .3)
+#
+# ## Experiment 6, exogenous labor, theta = 0
+# println("Experiment 6")
+# prim, res = Initialize()
+# prim_6 = @set prim.gamma = 1
+# prim_6 = @set prim_6.theta = 0
+# @time Run_all(prim_6,res, 1e-3, .3)
