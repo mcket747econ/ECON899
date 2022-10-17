@@ -23,10 +23,6 @@
 
 ##Proper initializer to put everything from the helpful functions together. I just wrote one part of that, I don't know what else needs inititization
 
-## Create a compiler file to run all these functions 
-
-
-
 function initialize_mut(R::Results,P::Params) #See PS5 for choices, this could be rewritten as an overall initilize or put into a bigger initilzer 
     @unpack a0, b0, a1, b1, R2 = R
     @unpack n_k, n_eps, n_K, n_z = P
@@ -36,7 +32,7 @@ function initialize_mut(R::Results,P::Params) #See PS5 for choices, this could b
     a1 = 0.999
 
     R2 = [0 0]
-
+    lambda = 0.1        ##Update with value for lambda
     pf_k = zeros(n_k, n_eps, n_K,n_z)
     pf_v = zeros(n_k, n_eps, n_K,n_z)
     return a0, b0, a1, b1, R2, pf_k, pf_v 
@@ -158,7 +154,7 @@ function Solve_KS(P::Params, G::Grids, S::Shocks, R::Results, lambda::Float64=0.
 
     stop = 0
     count = 0
-    while stop = 0 && minimum(R.R2) < m_gof ##wrong way to do the goodness of fit loop, should be an outer loop but let's get the inner loop working first
+    while stop == 0 && minimum(R.R2) < m_gof ##wrong way to do the goodness of fit loop, should be an outer loop but let's get the inner loop working first
         count +=1
         R.pf_k, R.pf_V = Bellman(P,G,S,R) #note this returns K' first, different than how we normally do it
 

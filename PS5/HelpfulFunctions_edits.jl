@@ -115,7 +115,7 @@ mutable struct Results
     bhat1::Float64
 end
 
-function draw_shocks(S::Shocks, N::Int64,T::Int64, sd::Int64=12032020)
+function DrawShocks(S::Shocks, N::Int64,T::Int64, sd::Int64=12032020)
     @unpack pgg, pbb, Mgg, Mgb, Mbg, Mbb = S
 
     # Shock
