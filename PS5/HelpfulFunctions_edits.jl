@@ -97,7 +97,7 @@ end
                                 pbg*Mbg pbb*Mbb]
 end
 
-mutable struct Results
+mutable struct Results 
     pf_k::Array{Float64,4}
     pf_v::Array{Float64,4}
 
@@ -106,14 +106,24 @@ mutable struct Results
     b0::Float64
     b1::Float64
 
-    R2::Array{Float64,1}
+    R2::Array{Float64}
 
     ##Jacob edit: Estimates in here as well
     ahat0::Float64
     ahat1::Float64
     bhat0::Float64
     bhat1::Float64
+    Results()=new()
 end
+
+# mutable struct Foo
+#     bar::Int
+#     baz::Int
+#     maz::Int
+# end
+
+# foo=Foo()
+# println(foo)
 
 function DrawShocks(S::Shocks, N::Int64,T::Int64, sd::Int64=12032020)
     @unpack pgg, pbb, Mgg, Mgb, Mbg, Mbb = S
