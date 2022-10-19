@@ -234,14 +234,16 @@ function Bellman(P::Params, G::Grids, S::Shocks, R::Results)
                 K_tomorrow = b0 + b1*log(K_today)
             end
             K_tomorrow = exp(K_tomorrow)
-
+            
             # See that K_tomorrow likely does not fall on our K_grid...this is why we need to interpolate!
             i_Kp = get_index(K_tomorrow, K_grid)
 
             for (i_eps, eps_today) in enumerate(eps_grid)
                 row = i_eps + n_eps*(i_z-1)
-
+                L_today = [.96 .9][i_eps]
                 for (i_k, k_today) in enumerate(k_grid)
+                    w_today = (1.0-cALPHA)*z_today*(K_today/L_today)^cALPHA
+                    r_today = (1.0-cALPHA)*z_today*(K_today/L_today)^(cALPHA-1.0)
                     budget_today = r_today*k_today + w_today*eps_today + (1.0 - cDEL)*k_today
 
                     # We are defining the continuation value. Notice that we are interpolating over k and K.
