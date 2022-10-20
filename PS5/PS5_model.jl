@@ -22,10 +22,9 @@
 ###Regression function needs review
 
 ##Proper initializer to put everything from the helpful functions together. I just wrote one part of that, I don't know what else needs inititization
-using Parameters, Plots, Optim, Interpolations  #last two are needed for the helpful functions
-using Random
-using Distributions
-include("HelpfulFunctions_edits.jl")
+# using Parameters, Plots, Optim, Interpolations  #last two are needed for the helpful functions
+# using Random, Distributions, LinearAlgebra
+# include("HelpfulFunctions_edits.jl")
 # function initialize_mut(R::Results,P::Params) #See PS5 for choices, this could be rewritten as an overall initilize or put into a bigger initilzer
 #     @unpack a0, b0, a1, b1, R2 = R
 #     @unpack n_k, n_eps, n_K, n_z = P
@@ -175,8 +174,10 @@ function log_autoreg(x,y,cons::Bool = true) #this one needs checking
         intercept = coefs[1]
         coef = coefs[2]
         error = ly - xi*coefs
-        y_m = ly-ones(n_x)*(ones(n_x)'*ones(n_x))^(-1)*(ones(n_x)'*ly)
-        R2 = (transpose(error)*error)/(transpose(y_m)*y_m)
+        # y_m = ly-ones(n_x)*(ones(n_x)'*ones(n_x))^(-1)*(ones(n_x)'*ly)
+        denom = transpose(ly)*(Matrix{Float64}(I, n_x, n_x)-ones(n_x)*(ones(n_x)'*ones(n_x))^(-1)*(ones(n_x)'))*ly    ##need LinearAlgebra
+        # denom = transpose(ly)*(Matrix{Float64}(I, 2, 2)-ones(n_x)*(ones(n_x)'*ones(n_x))^(-1)*(ones(n_x)'*ly)
+        R2 = 1-((transpose(error)*error)/denom)
     return intercept, coef, R2
     else
         lx = log.(x)
@@ -220,13 +221,14 @@ function Update_Coef(R::Results,lambda)
     @unpack a0,b0,a1,b1, ahat0,ahat1,bhat0,bhat1 = R
     a0 = lambda .*ahat0 .+ (1 .-lambda) .*a0
     b0 = lambda .*bhat0 .+ (1 .-lambda) .*b0
-    a0 = lambda .*ahat1 .+ (1 .-lambda) .*a1
-    a0 = lambda .*bhat1 .+ (1 .-lambda) .*b1
+    a1 = lambda .*ahat1 .+ (1 .-lambda) .*a1
+    b1 = lambda .*bhat1 .+ (1 .-lambda) .*b1
     return a0,b0,a1,b1
 end
 
 function Solve_KS(P::Params, G::Grids, S::Shocks, R::Results, lambda::Float64=0.5, tol_up = 1e-3, m_gof::Float64 =1 - 1e-2, kill = 10000)
     @unpack a0, b0, a1, b1, R2, pf_k, pf_v = R
+    @unpack n_k, n_eps, n_K, n_z = G
     pf_k_temp = zeros(n_k, n_eps, n_K,n_z)
     pf_v_temp = zeros(n_k, n_eps, n_K,n_z)
    #First step is to draw shocks
@@ -237,20 +239,21 @@ function Solve_KS(P::Params, G::Grids, S::Shocks, R::Results, lambda::Float64=0.
 
     stop = 0
     count = 0
-    while stop == 0 && minimum(R.R2) < m_gof ##wrong way to do the goodness of fit loop, should be an outer loop but let's get the inner loop working first
+    while count< kill && stop==0 ##wrong way to do the goodness of fit loop, should be an outer loop but let's get the inner loop working first
         count +=1
         pf_k_temp, pf_pf_v = Bellman(P,G,S,R) #note this returns K' first, different than how we normally do it
 
-        kappa, V_b = SimulateCapitalPath(R,P,Epsilon,Z) #I think this is all correct now
-        R.ahat0, R.ahat1, R.bhat0, R.bhat1, R.R2 = EstimateRegression(kappa) #Still need to write this
-
-        if count < kill && (abs(R.ahat0-R.a0)+abs(R.ahat1-R.a1)+abs(R.bhat0-R.b0)+abs(R.bhat1-R.b1)) > tol_up
+        kappa, V_b = SimulateCapitalPath(R,P,G,Epsilon,Z) #I think this is all correct now
+        R.ahat0, R.ahat1, R.bhat0, R.bhat1, R.R2 = EstimateRegression(R,R.Kappa) #Still need to write this
+    
+        if (abs(R.ahat0-R.a0)+abs(R.ahat1-R.a1)+abs(R.bhat0-R.b0)+abs(R.bhat1-R.b1)) > tol_up
             R.a0, R.b0, R.a1, R.b1 = Update_Coef(R::Results, lambda) #Still need to write this up
         else
             stop = 1
             println("The coefficients have converged")
             println("Goodness of fit (good, bad): ", R.R2)
         end
+        println("a0: ",R.a0,"\tb0: ", R.b0,"\ta1: ", R.a1,"\tb1: ", R.b1, "\t R2: ", R.R2, "gof: ",abs(R.ahat0-R.a0)+abs(R.ahat1-R.a1)+abs(R.bhat0-R.b0)+abs(R.bhat1-R.b1))
     end
     println("Converged in: ",count," iterations")
     println("Predicted a0: ",R.a0)
@@ -258,29 +261,15 @@ function Solve_KS(P::Params, G::Grids, S::Shocks, R::Results, lambda::Float64=0.
     println("Predicted b0: ", R.b0)
     println("Predicted b1: ", R.b1)
 end
+# Solve_KS(P,G,S,R)
 
 function overall_solve()
-    idio_s,agg_s = Drawshocks(S,N,T,sd,)
-
-
-
-
-    stop == 0
-    while stop == 0
-        pf_k,pf_v = Bellman(P,G,S,R)
-
-
-
-
-
-    end
-
-
-
-
-
-
-
+    P,G,S,R = initialize_overall()
+    Epsilon, Z = DrawShocks(S,P.N,P.T)
+    R.pf_k, R.pf_v = Bellman(P,G,S,R)
+    R.Kappa,R.V_matrix = SimulateCapitalPath(R, P,G, Epsilon,Z)
+    R.ahat0, R.ahat1, R.bhat0, R.bhat1, R.R2 = EstimateRegression(R,R.Kappa)
+    #First step is to draw shocks
+    Solve_KS(P,G,S,R)
 end
-
 

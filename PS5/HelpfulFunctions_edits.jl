@@ -97,7 +97,7 @@ end
                                 pbg*Mbg pbb*Mbb]
 end
 
-mutable struct Results 
+mutable struct Results
     pf_k::Array{Float64,4}
     pf_v::Array{Float64,4}
 
@@ -106,14 +106,15 @@ mutable struct Results
     b0::Float64
     b1::Float64
 
-    R2::Array{Float64}
+    R2::Array{Float64,1}
 
     ##Jacob edit: Estimates in here as well
     ahat0::Float64
     ahat1::Float64
     bhat0::Float64
     bhat1::Float64
-    Results()=new()
+    V_matrix::Array{Float64,2}
+    Kappa::Array{Float64,2}
 end
 
 # mutable struct Foo
@@ -230,20 +231,22 @@ function Bellman(P::Params, G::Grids, S::Shocks, R::Results)
         for (i_K, K_today) in enumerate(K_grid)
             if i_z == 1
                 K_tomorrow = a0 + a1*log(K_today)
+                L_today = (1.0-u_g)*eps_h
             elseif i_z == 2
                 K_tomorrow = b0 + b1*log(K_today)
+                L_today = (1.0-u_b)*eps_h
             end
             K_tomorrow = exp(K_tomorrow)
             
             # See that K_tomorrow likely does not fall on our K_grid...this is why we need to interpolate!
             i_Kp = get_index(K_tomorrow, K_grid)
-
+            w_today = (1.0-cALPHA)*z_today*(K_today/L_today)^cALPHA
+            r_today = cALPHA*z_today*(K_today/L_today)^(cALPHA-1.0)
             for (i_eps, eps_today) in enumerate(eps_grid)
                 row = i_eps + n_eps*(i_z-1)
                 L_today = [.96 .9][i_eps]
                 for (i_k, k_today) in enumerate(k_grid)
-                    w_today = (1.0-cALPHA)*z_today*(K_today/L_today)^cALPHA
-                    r_today = (1.0-cALPHA)*z_today*(K_today/L_today)^(cALPHA-1.0)
+
                     budget_today = r_today*k_today + w_today*eps_today + (1.0 - cDEL)*k_today
 
                     # We are defining the continuation value. Notice that we are interpolating over k and K.
