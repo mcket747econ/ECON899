@@ -39,7 +39,7 @@
 #     pf_v = zeros(n_k, n_eps, n_K,n_z)
 #     return a0, b0, a1, b1, R2, pf_k, pf_v
 # end
-
+Pkg;Pkg.add("GLM")
 
 function initialize_overall()
     P = Params()
@@ -107,12 +107,13 @@ function SimulateCapitalPath(R::Results, P::Params,G::Grids, Epsilon::Array{Floa
 
     kappa::Array{Float64,2} = zeros(T-1,3) #since the first one is Kbar2. I think this is the proper bounds but I am not sure
     V::Array{Float64,2} = zeros(N,T-1) #Storing the panel. I hate that we have to do this column by column but rows come first
-
+    pf_k_interpol = interpolate(pf_k, BSpline(Linear()) )
     #do initial column seperately
     K_index = trunc(Int64,get_index(11.55,K_grid))
     for n in 1:N
         #Need to get the index for k^t_n and Kbar_t, not directly insert them.
-        V[n,1] = pf_k[K_index,trunc(Int64,Epsilon[n,1]),K_index,trunc(Int64,Z[1])] #11.55 is a hardfix, this probably doesn't work? Need to understand what the policy function is saying better
+        #V[n,1] = pf_k[K_index,trunc(Int64,Epsilon[n,1]),K_index,trunc(Int64,Z[1])] #11.55 is a hardfix, this probably doesn't work? Need to understand what the policy function is saying better
+        V[n,1] = pf_k_interpol(K_index,Epsilon[n,1],K_index,Z[1])
     end
     kappa[1,1] = sum(V[:,1])/N #
     kappa[1,2] = Z[1]
@@ -121,7 +122,8 @@ function SimulateCapitalPath(R::Results, P::Params,G::Grids, Epsilon::Array{Floa
     for t in 2:T-1 #I think this is right because in the pseudocode, it only goes to Kbar_T
         for n in 1:N
             #See details above about why this doesn't work right
-            V[n,t] = pf_k[trunc(Int64,get_index(V[n,t-1],K_grid)),trunc(Int64,Epsilon[n,t]),trunc(Int64,get_index(kappa[t-1,1],K_grid)),trunc(Int64,Z[t])] #need to flip my epsilon I think
+            #V[n,t] = pf_k[trunc(Int64,get_index(V[n,t-1],K_grid)),trunc(Int64,Epsilon[n,t]),trunc(Int64,get_index(kappa[t-1,1],K_grid)),trunc(Int64,Z[t])] #need to flip my epsilon I think
+            V[n,t] = pf_k_interpol(get_index(V[n,t-1],K_grid),Epsilon[n,t],get_index(kappa[t-1,1],K_grid),Z[t])
         end
         kappa[t,1] = sum(V[:,t])/N
         kappa[t,2] = Z[t] #for the sort later on, tracks the state of the world when the decision was made
@@ -191,6 +193,19 @@ function log_autoreg(x,y,cons::Bool = true) #this one needs checking
     end
 end
 
+function log_regression(kappa,y)
+    df1 =
+    ols1 =lm(@formula(y~x),)
+
+
+
+
+
+
+
+
+end
+
 
 # function EstimateRegression(kappa,cons::Bool = true )
 #     #first do a sort based on z
@@ -245,7 +260,7 @@ function Solve_KS(P::Params, G::Grids, S::Shocks, R::Results, lambda::Float64=0.
 
         kappa, V_b = SimulateCapitalPath(R,P,G,Epsilon,Z) #I think this is all correct now
         R.ahat0, R.ahat1, R.bhat0, R.bhat1, R.R2 = EstimateRegression(R,R.Kappa) #Still need to write this
-    
+
         if (abs(R.ahat0-R.a0)+abs(R.ahat1-R.a1)+abs(R.bhat0-R.b0)+abs(R.bhat1-R.b1)) > tol_up
             R.a0, R.b0, R.a1, R.b1 = Update_Coef(R::Results, lambda) #Still need to write this up
         else
@@ -272,4 +287,3 @@ function overall_solve()
     #First step is to draw shocks
     Solve_KS(P,G,S,R)
 end
-
