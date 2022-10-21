@@ -40,6 +40,7 @@
 #     return a0, b0, a1, b1, R2, pf_k, pf_v
 # end
 Pkg;Pkg.add("GLM")
+Pkg;Pkg.add(["DataFrames","Printf"])
 
 function initialize_overall()
     P = Params()
@@ -165,45 +166,49 @@ function state_sort(array) #figure this might be worth doing, will need to check
     return good, bad
 end
 
-function log_autoreg(x,y,cons::Bool = true) #this one needs checking
-    if cons == true
-        n_x = length(x)
-        lx = log.(x)
-        ly = log.(y)
-        xi = hcat(ones(n_x),lx) #create a new matrix with a column of ones
-        xit = transpose(xi)
-        coefs = (xit*xi)^(-1)*(xit*ly) #linear regression
-        intercept = coefs[1]
-        coef = coefs[2]
-        error = ly - xi*coefs
-        # y_m = ly-ones(n_x)*(ones(n_x)'*ones(n_x))^(-1)*(ones(n_x)'*ly)
-        denom = transpose(ly)*(Matrix{Float64}(I, n_x, n_x)-ones(n_x)*(ones(n_x)'*ones(n_x))^(-1)*(ones(n_x)'))*ly    ##need LinearAlgebra
-        # denom = transpose(ly)*(Matrix{Float64}(I, 2, 2)-ones(n_x)*(ones(n_x)'*ones(n_x))^(-1)*(ones(n_x)'*ly)
-        R2 = 1-((transpose(error)*error)/denom)
-    return intercept, coef, R2
-    else
-        lx = log.(x)
-        ly = log.(y)
-        xit = transpose(xi)
-        coef = (xit*xi)^(-1)*(xit*ly)
-        error = ly - xi*coef
-        y_m = ly-ones(n_x)*(ones(n_x)'*ones(n_x))^(-1)*(ones(n_x)'*ly)
-        R2 = (transpose(error)*error)/(transpose(y_m)*y_m)
-    return coef, R2
-    end
-end
+# function log_autoreg(x,y,cons::Bool = true) #this one needs checking
+#     if cons == true
+#         n_x = length(x)
+#         lx = log.(x)
+#         ly = log.(y)
+#         xi = hcat(ones(n_x),lx) #create a new matrix with a column of ones
+#         xit = transpose(xi)
+#         coefs = (xit*xi)^(-1)*(xit*ly) #linear regression
+#         intercept = coefs[1]
+#         coef = coefs[2]
+#         error = ly - xi*coefs
+#         # y_m = ly-ones(n_x)*(ones(n_x)'*ones(n_x))^(-1)*(ones(n_x)'*ly)
+#         denom = transpose(ly)*(Matrix{Float64}(I, n_x, n_x)-ones(n_x)*(ones(n_x)'*ones(n_x))^(-1)*(ones(n_x)'))*ly    ##need LinearAlgebra
+#         # denom = transpose(ly)*(Matrix{Float64}(I, 2, 2)-ones(n_x)*(ones(n_x)'*ones(n_x))^(-1)*(ones(n_x)'*ly)
+#         R2 = 1 .- ((transpose(error)*error)/denom)
+#     return intercept, coef, R2
+#     else
+#         lx = log.(x)
+#         ly = log.(y)
+#         xit = transpose(xi)
+#         coef = (xit*xi)^(-1)*(xit*ly)
+#         error = ly - xi*coef
+#         y_m = ly-ones(n_x)*(ones(n_x)'*ones(n_x))^(-1)*(ones(n_x)'*ly)
+#         R2 = (transpose(error)*error)/(transpose(y_m)*y_m)
+#     return coef, R2
+#     end
+# end
 
-function log_regression(kappa,y)
-    df1 =
-    ols1 =lm(@formula(y~x),)
-
-
-
-
-
-
+function log_regression(kappa_a,kappa_b)
+    df1 = DataFrame(x=kappa_a[:,2], y=kappa_a[:,1])
+    df2 = DataFrame(x=kappa_b[:,2], y=kappa_b[:,1])
+    # df1 = df1[df1."x".!=0, :]
+    # df2 = df2[df2."x".!=0, :]
+    ols1 =lm(@formula(y~x),df1)
+    ols2 =lm(@formula(y~x),df2)
 
 
+
+
+
+
+
+    ols1, ols2
 end
 
 
@@ -223,9 +228,12 @@ function EstimateRegression(R::Results,kappa,cons::Bool = true)
     #first do a sort based on z
     kappa_a, kappa_b = state_sort(kappa) #a is for good state
     #Next run regressions
-    ahat0, ahat1, R2[1] = log_autoreg(kappa_a[:,2],kappa_a[:,1],cons) #not sure what the right Y is, it's not simply epsilon, it might be Kappa again
-    bhat0, bhat1, R2[2] = log_autoreg(kappa_b[:,2],kappa_b[:,1],cons) #not sure what the right Y is
-
+    #ahat0, ahat1, R2[1] = log_autoreg(kappa_a[:,2],kappa_a[:,1],cons) #not sure what the right Y is, it's not simply epsilon, it might be Kappa again
+    #bhat0, bhat1, R2[2] = log_autoreg(kappa_b[:,2],kappa_b[:,1],cons) #not sure what the right Y is
+    ols1, ols2 = log_regression(kappa_a,kappa_b) #not sure what the right Y is, it's not simply epsilon, it might be Kappa again
+    ahat0,ahat1 = coef(ols1)
+    bhat0, bhat1 = coef(ols2)
+    R2 = [r2(ols1), r2(ols2)]
 
     return ahat0, ahat1, bhat0, bhat1, R2
 end
