@@ -195,6 +195,8 @@ end
 # end
 
 function log_regression(kappa_a,kappa_b)
+    kappa_a = log.(kappa_a)
+    kappa_b = log.(kappa_b)
     df1 = DataFrame(x=kappa_a[:,2], y=kappa_a[:,1])
     df2 = DataFrame(x=kappa_b[:,2], y=kappa_b[:,1])
     # df1 = df1[df1."x".!=0, :]
@@ -234,6 +236,7 @@ function EstimateRegression(R::Results,kappa,cons::Bool = true)
     ahat0,ahat1 = coef(ols1)
     bhat0, bhat1 = coef(ols2)
     R2 = [r2(ols1), r2(ols2)]
+    println("r2 for ols2 is", r2(ols2))
 
     return ahat0, ahat1, bhat0, bhat1, R2
 end
@@ -295,3 +298,4 @@ function overall_solve()
     #First step is to draw shocks
     Solve_KS(P,G,S,R)
 end
+
