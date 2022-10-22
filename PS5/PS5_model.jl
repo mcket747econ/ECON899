@@ -39,8 +39,8 @@
 #     pf_v = zeros(n_k, n_eps, n_K,n_z)
 #     return a0, b0, a1, b1, R2, pf_k, pf_v
 # end
-Pkg;Pkg.add("GLM")
-Pkg;Pkg.add(["DataFrames","Printf"])
+# Pkg;Pkg.add("GLM")
+# Pkg;Pkg.add(["DataFrames","Printf"])
 
 function initialize_overall()
     P = Params()
@@ -65,7 +65,7 @@ function initialize_overall()
     return P,G,S,R
 
 end
-P,G,S,R = initialize_overall()
+# P,G,S,R = initialize_overall()
 
 # function SimulateCapitalPath(R::Results, P::Params,G::Grids,Epsilon,Z) #need to figure out the proper bounds on this, right now I think its to T-1
 #     @unpack pf_k = R
@@ -101,46 +101,50 @@ P,G,S,R = initialize_overall()
 #
 #     return kappa_b, V_b
 # end
+
 function SimulateCapitalPath(R::Results, P::Params,G::Grids, Epsilon::Array{Float64, 2},Z::Array{Float64, 1}) #need to figure out the proper bounds on this, right now I think its to T-1
     @unpack pf_k,pf_v = R
     @unpack N, T, burn = P
-    @unpack K_grid = G
+    @unpack K_grid,k_grid = G
 
+        
     kappa::Array{Float64,2} = zeros(T-1,3) #since the first one is Kbar2. I think this is the proper bounds but I am not sure
-    V::Array{Float64,2} = zeros(N,T-1) #Storing the panel. I hate that we have to do this column by column but rows come first
+    V::Array{Float64,2} = zeros(N,T) #Storing the panel. I hate that we have to do this column by column but rows come first
     pf_k_interpol = interpolate(pf_k, BSpline(Linear()) )
     #do initial column seperately
-    K_index = trunc(Int64,get_index(11.55,K_grid))
     for n in 1:N
         #Need to get the index for k^t_n and Kbar_t, not directly insert them.
         #V[n,1] = pf_k[K_index,trunc(Int64,Epsilon[n,1]),K_index,trunc(Int64,Z[1])] #11.55 is a hardfix, this probably doesn't work? Need to understand what the policy function is saying better
-        V[n,1] = pf_k_interpol(K_index,Epsilon[n,1],K_index,Z[1])
+        V[n,1] = 11.556444894066576
     end
-    kappa[1,1] = sum(V[:,1])/N #
+    kappa[1,1] = 11.556444894066576
     kappa[1,2] = Z[1]
-    kappa[1,3] = K_index #Column three would be capital today and thus X?
+    kappa[1,3] = 11.556444894066576 #Column three would be capital today and thus X?
+    K_val = 11.556444894066576
 
     for t in 2:T-1 #I think this is right because in the pseudocode, it only goes to Kbar_T
+        K_index = get_index(kappa[t-1,1],K_grid)
         for n in 1:N
             #See details above about why this doesn't work right
             #V[n,t] = pf_k[trunc(Int64,get_index(V[n,t-1],K_grid)),trunc(Int64,Epsilon[n,t]),trunc(Int64,get_index(kappa[t-1,1],K_grid)),trunc(Int64,Z[t])] #need to flip my epsilon I think
-            V[n,t] = pf_k_interpol(get_index(V[n,t-1],K_grid),Epsilon[n,t],get_index(kappa[t-1,1],K_grid),Z[t])
+            V[n,t] = pf_k_interpol(get_index(V[n,t-1],k_grid),Epsilon[n,t],K_index,Z[t])
         end
         kappa[t,1] = sum(V[:,t])/N
         kappa[t,2] = Z[t] #for the sort later on, tracks the state of the world when the decision was made
         kappa[t,3] = kappa[t-1,1] #This makes column three yesterday's capital choice, ie today's capital. This is X in that case (I think)
+        if mod(t,1000) == 0
+            println("another 10%")
+        end
     end
 
     #burn the first 1000 columns/rows (kappa is weird)
     kappa_b::Array{Float64,2} = kappa[burn+1:T-1,:]
     V_b::Array{Float64,2} = V[:,burn+1:T-1]
-
-    return kappa_b, V_b
 end
 
-Epsilon, Z = DrawShocks(S,P.N,P.T)
-R.pf_k, R.pf_v = Bellman(P,G,S,R)
-R.Kappa,R.V_matrix = SimulateCapitalPath(R, P,G, Epsilon,Z)
+# Epsilon, Z = DrawShocks(S,P.N,P.T)
+# R.pf_k, R.pf_v = Bellman(P,G,S,R)
+# R.Kappa,R.V_matrix = SimulateCapitalPath(R, P,G, Epsilon,Z)
 
 function state_sort(array) #figure this might be worth doing, will need to check dimensions
     n_b = length(array[:,1])
@@ -195,21 +199,12 @@ end
 # end
 
 function log_regression(kappa_a,kappa_b)
-    kappa_a = log.(kappa_a)
-    kappa_b = log.(kappa_b)
     df1 = DataFrame(x=kappa_a[:,2], y=kappa_a[:,1])
     df2 = DataFrame(x=kappa_b[:,2], y=kappa_b[:,1])
     # df1 = df1[df1."x".!=0, :]
     # df2 = df2[df2."x".!=0, :]
     ols1 =lm(@formula(y~x),df1)
     ols2 =lm(@formula(y~x),df2)
-
-
-
-
-
-
-
     ols1, ols2
 end
 
@@ -236,12 +231,11 @@ function EstimateRegression(R::Results,kappa,cons::Bool = true)
     ahat0,ahat1 = coef(ols1)
     bhat0, bhat1 = coef(ols2)
     R2 = [r2(ols1), r2(ols2)]
-    println("r2 for ols2 is", r2(ols2))
 
     return ahat0, ahat1, bhat0, bhat1, R2
 end
 
-R.ahat0, R.ahat1, R.bhat0, R.bhat1, R.R2 = EstimateRegression(R,R.Kappa)
+# R.ahat0, R.ahat1, R.bhat0, R.bhat1, R.R2 = EstimateRegression(R,R.Kappa)
 
 function Update_Coef(R::Results,lambda)
     @unpack a0,b0,a1,b1, ahat0,ahat1,bhat0,bhat1 = R
@@ -267,7 +261,7 @@ function Solve_KS(P::Params, G::Grids, S::Shocks, R::Results, lambda::Float64=0.
     count = 0
     while count< kill && stop==0 ##wrong way to do the goodness of fit loop, should be an outer loop but let's get the inner loop working first
         count +=1
-        pf_k_temp, pf_pf_v = Bellman(P,G,S,R) #note this returns K' first, different than how we normally do it
+        pf_k_temp, pf_pf_v = solve_HH_problem(P,G,S,R) #note this returns K' first, different than how we normally do it
 
         kappa, V_b = SimulateCapitalPath(R,P,G,Epsilon,Z) #I think this is all correct now
         R.ahat0, R.ahat1, R.bhat0, R.bhat1, R.R2 = EstimateRegression(R,R.Kappa) #Still need to write this
@@ -292,10 +286,9 @@ end
 function overall_solve()
     P,G,S,R = initialize_overall()
     Epsilon, Z = DrawShocks(S,P.N,P.T)
-    R.pf_k, R.pf_v = Bellman(P,G,S,R)
+    R.pf_k, R.pf_v = solve_HH_problem(P,G,S,R)
     R.Kappa,R.V_matrix = SimulateCapitalPath(R, P,G, Epsilon,Z)
     R.ahat0, R.ahat1, R.bhat0, R.bhat1, R.R2 = EstimateRegression(R,R.Kappa)
     #First step is to draw shocks
     Solve_KS(P,G,S,R)
 end
-

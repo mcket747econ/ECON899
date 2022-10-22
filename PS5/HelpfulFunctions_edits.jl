@@ -212,6 +212,28 @@ function DrawShocks(S::Shocks, N::Int64,T::Int64, sd::Int64=12032020)
     return idio_state, agg_state
 end
 
+
+function solve_HH_problem(P::Params, G::Grids, S::Shocks, R::Results)
+    err = 100.0
+    tol = .001
+    i = 0
+    while true
+        i+=1
+        vf_tp1, pf_tp1 = Bellman(P,G,S,R)
+        err = maximum(abs.(R.pf_v - vf_tp1))/abs(maximum(vf_tp1))
+        println("Error = ",maximum(abs.(R.pf_v - vf_tp1)))
+        println("Error = ",abs(maximum(vf_tp1)))
+        R.pf_v = vf_tp1
+        R.pf_k = pf_tp1
+        println("Error = ",maximum(abs.(R.pf_v - vf_tp1)))
+        println("Error = ",abs(maximum(vf_tp1)))
+        if err < tol
+            break
+        end
+    end
+    println("Solved after ", i, " iterations")
+end
+
 function Bellman(P::Params, G::Grids, S::Shocks, R::Results)
     @unpack cBET, cALPHA, cDEL = P
     @unpack n_k, k_grid, n_eps, eps_grid, eps_h, K_grid, n_K, n_z, z_grid = G
@@ -244,9 +266,7 @@ function Bellman(P::Params, G::Grids, S::Shocks, R::Results)
             r_today = cALPHA*z_today*(K_today/L_today)^(cALPHA-1.0)
             for (i_eps, eps_today) in enumerate(eps_grid)
                 row = i_eps + n_eps*(i_z-1)
-                L_today = [.96 .9][i_eps]
                 for (i_k, k_today) in enumerate(k_grid)
-
                     budget_today = r_today*k_today + w_today*eps_today + (1.0 - cDEL)*k_today
 
                     # We are defining the continuation value. Notice that we are interpolating over k and K.
@@ -281,19 +301,46 @@ function Bellman(P::Params, G::Grids, S::Shocks, R::Results)
     return pf_k_up, pf_v_up
 end
 
-function get_index(val::Float64, grid::Array{Float64,1})
-    n = length(grid)
-    index = 0
-    if val <= grid[1]
-        index = 1
-    elseif val >= grid[n]
-        index = n
-    else
-        index_upper = findfirst(x->x>val, grid)
-        index_lower = index_upper - 1
-        val_upper, val_lower = grid[index_upper], grid[index_lower]
+# function get_index(val::Float64, grid::Array{Float64,1})
+#     n = length(grid)
+#     index = 0
+#     if val <= grid[1]
+#         index = 1
+#     elseif val >= grid[n]
+#         index = n
+#     else
+#         index_upper = findfirst(x->x>val, grid)
+#         index_lower = index_upper - 1
+#         val_upper, val_lower = grid[index_upper], grid[index_lower]
 
-        index = index_lower + (val - val_lower) / (val_upper - val_lower)
-    end
-    return index
+#         index = index_lower + (val - val_lower) / (val_upper - val_lower)
+#     end
+#     return index
+# end
+
+function get_index(val::Float64, grid::Array{Float64,1})
+    interp =  interpolate(grid, BSpline(Linear()))
+    find_index(k) = abs(interp(k) - val)
+    index = optimize(find_index, 1.0, length(grid)).minimizer
+    index
+end
+
+
+# function  get_index(val::Float64, grid::Array{Float64,1}) 
+#     interp =  interpolate(grid, BSpline(Linear()))
+#     abs_find(k) = abs(interp(k) - val)
+#     index =searchsorted(grid,val)
+#     index = optimize(abs_find, index.stop, index.start).minimizer
+#     index
+# end
+
+function findnearest(a,x)
+    length(a) > 0 || return 0:-1
+    r = searchsorted(a,x)
+    length(r) > 0 && return r
+    last(r) < 1 && return searchsorted(a,a[first(r)])
+    first(r) > length(a) && return searchsorted(a,a[last(r)])
+    x-a[last(r)] < a[first(r)]-x && return searchsorted(a,a[last(r)])
+    x-a[last(r)] > a[first(r)]-x && return searchsorted(a,a[first(r)])
+    return first(searchsorted(a,a[last(r)])):last(searchsorted(a,a[first(r)]))
 end
