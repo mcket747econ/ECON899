@@ -107,7 +107,7 @@ function SimulateCapitalPath(R::Results, P::Params,G::Grids, Epsilon::Array{Floa
     @unpack N, T, burn = P
     @unpack K_grid,k_grid = G
 
-        
+
     kappa::Array{Float64,2} = zeros(T-1,3) #since the first one is Kbar2. I think this is the proper bounds but I am not sure
     V::Array{Float64,2} = zeros(N,T) #Storing the panel. I hate that we have to do this column by column but rows come first
     pf_k_interpol = interpolate(pf_k, BSpline(Linear()) )
@@ -247,7 +247,7 @@ function Update_Coef(R::Results,lambda)
     return a0,b0,a1,b1
 end
 
-function Solve_KS(P::Params, G::Grids, S::Shocks, R::Results, lambda::Float64=0.5, tol_up = 1e-3, m_gof::Float64 =1 - 1e-2, kill = 10000)
+function overall_solve(P::Params, G::Grids, S::Shocks, R::Results, lambda::Float64=0.5, tol_up = 1e-3, m_gof::Float64 =1 - 1e-2, kill = 10000)
     @unpack a0, b0, a1, b1, R2, pf_k, pf_v = R
     @unpack n_k, n_eps, n_K, n_z = G
     pf_k_temp = zeros(n_k, n_eps, n_K,n_z)
@@ -264,7 +264,7 @@ function Solve_KS(P::Params, G::Grids, S::Shocks, R::Results, lambda::Float64=0.
         count +=1
         solve_HH_problem(P,G,S,R) #note this returns K' first, different than how we normally do it
 
-        kappa, V_b = SimulateCapitalPath(R,P,G,Epsilon,Z) #I think this is all correct now
+        R.Kappa, R.V_matrix = SimulateCapitalPath(R,P,G,Epsilon,Z) #I think this is all correct now
         R.ahat0, R.ahat1, R.bhat0, R.bhat1, R.R2 = EstimateRegression(R,R.Kappa) #Still need to write this
 
         if (abs(R.ahat0-R.a0)+abs(R.ahat1-R.a1)+abs(R.bhat0-R.b0)+abs(R.bhat1-R.b1)) > tol_up
@@ -285,12 +285,15 @@ function Solve_KS(P::Params, G::Grids, S::Shocks, R::Results, lambda::Float64=0.
 end
 # Solve_KS(P,G,S,R)
 
-function overall_solve()
-    P,G,S,R = initialize_overall()
-    Epsilon, Z = DrawShocks(S,P.N,P.T)
-    solve_HH_problem(P,G,S,R)           ## solves household problem (iterating over the bellman until the value function converges)
-    R.Kappa,R.V_matrix = SimulateCapitalPath(R, P,G, Epsilon,Z)
-    R.ahat0, R.ahat1, R.bhat0, R.bhat1, R.R2 = EstimateRegression(R,R.Kappa)
-    #First step is to draw shocks
-    Solve_KS(P,G,S,R)
-end
+# function overall_solve()
+#     P,G,S,R = initialize_overall()
+#
+#     Epsilon, Z = DrawShocks(S,P.N,P.T)
+#     solve_HH_problem(P,G,S,R)           ## solves household problem (iterating over the bellman until the value function converges)
+#     R.Kappa,R.V_matrix = SimulateCapitalPath(R, P,G, Epsilon,Z)
+#     R.ahat0, R.ahat1, R.bhat0, R.bhat1, R.R2 = EstimateRegression(R,R.Kappa)
+#     #First step is to draw shocks
+#     Solve_KS(P,G,S,R)
+#     return P,G,S,R
+# end
+
