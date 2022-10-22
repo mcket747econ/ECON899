@@ -133,13 +133,14 @@ function SimulateCapitalPath(R::Results, P::Params,G::Grids, Epsilon::Array{Floa
         kappa[t,2] = Z[t] #for the sort later on, tracks the state of the world when the decision was made
         kappa[t,3] = kappa[t-1,1] #This makes column three yesterday's capital choice, ie today's capital. This is X in that case (I think)
         if mod(t,1000) == 0
-            println("another 10%")
+            println("Roughly ",t/T,"%")
         end
     end
 
     #burn the first 1000 columns/rows (kappa is weird)
     kappa_b::Array{Float64,2} = kappa[burn+1:T-1,:]
     V_b::Array{Float64,2} = V[:,burn+1:T-1]
+    return kappa_b, V_b
 end
 
 # Epsilon, Z = DrawShocks(S,P.N,P.T)
@@ -261,7 +262,7 @@ function Solve_KS(P::Params, G::Grids, S::Shocks, R::Results, lambda::Float64=0.
     count = 0
     while count< kill && stop==0 ##wrong way to do the goodness of fit loop, should be an outer loop but let's get the inner loop working first
         count +=1
-        pf_k_temp, pf_pf_v = solve_HH_problem(P,G,S,R) #note this returns K' first, different than how we normally do it
+        solve_HH_problem(P,G,S,R) #note this returns K' first, different than how we normally do it
 
         kappa, V_b = SimulateCapitalPath(R,P,G,Epsilon,Z) #I think this is all correct now
         R.ahat0, R.ahat1, R.bhat0, R.bhat1, R.R2 = EstimateRegression(R,R.Kappa) #Still need to write this
@@ -273,7 +274,8 @@ function Solve_KS(P::Params, G::Grids, S::Shocks, R::Results, lambda::Float64=0.
             println("The coefficients have converged")
             println("Goodness of fit (good, bad): ", R.R2)
         end
-        println("a0: ",R.a0,"\tb0: ", R.b0,"\ta1: ", R.a1,"\tb1: ", R.b1, "\t R2: ", R.R2, "gof: ",abs(R.ahat0-R.a0)+abs(R.ahat1-R.a1)+abs(R.bhat0-R.b0)+abs(R.bhat1-R.b1))
+        println("a0: ",R.a0,"\tb0: ", R.b0,"\ta1: ", R.a1,"\tb1: ", R.b1, "\t R2: ", R.R2, "\t gof: ",abs(R.ahat0-R.a0)+abs(R.ahat1-R.a1)+abs(R.bhat0-R.b0)+abs(R.bhat1-R.b1))
+        println("KS Iteration: ", count)
     end
     println("Converged in: ",count," iterations")
     println("Predicted a0: ",R.a0)

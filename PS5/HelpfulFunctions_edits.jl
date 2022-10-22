@@ -228,7 +228,6 @@ function solve_HH_problem(P::Params, G::Grids, S::Shocks, R::Results)
         end
     end
     println("Solved after ", i, " iterations")
-    R.pf_k, R.pf_v
 end
 
 function Bellman(P::Params, G::Grids, S::Shocks, R::Results)
@@ -321,8 +320,6 @@ function get_index(val::Float64, grid::Array{Float64,1})
     index = optimize(find_index, 1.0, length(grid)).minimizer
     index
 end
-
-
 # function  get_index(val::Float64, grid::Array{Float64,1}) 
 #     interp =  interpolate(grid, BSpline(Linear()))
 #     abs_find(k) = abs(interp(k) - val)
@@ -330,14 +327,3 @@ end
 #     index = optimize(abs_find, index.stop, index.start).minimizer
 #     index
 # end
-
-function findnearest(a,x)
-    length(a) > 0 || return 0:-1
-    r = searchsorted(a,x)
-    length(r) > 0 && return r
-    last(r) < 1 && return searchsorted(a,a[first(r)])
-    first(r) > length(a) && return searchsorted(a,a[last(r)])
-    x-a[last(r)] < a[first(r)]-x && return searchsorted(a,a[last(r)])
-    x-a[last(r)] > a[first(r)]-x && return searchsorted(a,a[first(r)])
-    return first(searchsorted(a,a[last(r)])):last(searchsorted(a,a[first(r)]))
-end

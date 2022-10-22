@@ -13,4 +13,4 @@ include("ps5_model.jl")
 ## Should probably remove "print" in KS_solve
 overall_solve()
 
-
+if occursin("Rafeh",pwd()) cd("C:/Users/Rafeh/Documents/GitHub/ECON899/PS5") end #Insert your own paths here
