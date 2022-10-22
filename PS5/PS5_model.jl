@@ -133,7 +133,7 @@ function SimulateCapitalPath(R::Results, P::Params,G::Grids, Epsilon::Array{Floa
         kappa[t,2] = Z[t] #for the sort later on, tracks the state of the world when the decision was made
         kappa[t,3] = kappa[t-1,1] #This makes column three yesterday's capital choice, ie today's capital. This is X in that case (I think)
         if mod(t,1000) == 0
-            println("Roughly ",t/T,"%")
+            println("Roughly ",t/T * 100,"%")
         end
     end
 
