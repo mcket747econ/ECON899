@@ -286,7 +286,7 @@ end
 function overall_solve()
     P,G,S,R = initialize_overall()
     Epsilon, Z = DrawShocks(S,P.N,P.T)
-    R.pf_k, R.pf_v = solve_HH_problem(P,G,S,R)
+    solve_HH_problem(P,G,S,R)           ## solves household problem (iterating over the bellman until the value function converges)
     R.Kappa,R.V_matrix = SimulateCapitalPath(R, P,G, Epsilon,Z)
     R.ahat0, R.ahat1, R.bhat0, R.bhat1, R.R2 = EstimateRegression(R,R.Kappa)
     #First step is to draw shocks

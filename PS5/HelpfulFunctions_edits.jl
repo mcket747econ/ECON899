@@ -219,19 +219,16 @@ function solve_HH_problem(P::Params, G::Grids, S::Shocks, R::Results)
     i = 0
     while true
         i+=1
-        vf_tp1, pf_tp1 = Bellman(P,G,S,R)
+        pf_tp1, vf_tp1 = Bellman(P,G,S,R)
         err = maximum(abs.(R.pf_v - vf_tp1))/abs(maximum(vf_tp1))
-        println("Error = ",maximum(abs.(R.pf_v - vf_tp1)))
-        println("Error = ",abs(maximum(vf_tp1)))
         R.pf_v = vf_tp1
         R.pf_k = pf_tp1
-        println("Error = ",maximum(abs.(R.pf_v - vf_tp1)))
-        println("Error = ",abs(maximum(vf_tp1)))
         if err < tol
             break
         end
     end
     println("Solved after ", i, " iterations")
+    R.pf_k, R.pf_v
 end
 
 function Bellman(P::Params, G::Grids, S::Shocks, R::Results)
