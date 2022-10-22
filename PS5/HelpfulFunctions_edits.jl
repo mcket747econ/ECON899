@@ -7,16 +7,16 @@
     cBET::Float64 = 0.99
     cALPHA::Float64 = 0.36
     cDEL::Float64 = 0.025
-    #cLAM::Float64 = 0.5 define as argument in function, not as a paramter 
+    #cLAM::Float64 = 0.5 define as argument in function, not as a paramter
 
     N::Int64 = 5000
     T::Int64 = 11000
     burn::Int64 = 1000
 
-    tol_vfi::Float64 = 1e-4 
-    tol_coef::Float64 = 1e-4 #incorpated into function as argument, not paramters 
-    tol_r2::Float64 = 1.0 - 1e-2 #incorporated into function as argument, not paramters 
-    maxit::Int64 = 10000 #incorporated into function as argument 
+    tol_vfi::Float64 = 1e-4
+    tol_coef::Float64 = 1e-4 #incorpated into function as argument, not paramters
+    tol_r2::Float64 = 1.0 - 1e-2 #incorporated into function as argument, not paramters
+    maxit::Int64 = 10000 #incorporated into function as argument
 end
 
 @with_kw struct Grids
@@ -255,7 +255,7 @@ function Bellman(P::Params, G::Grids, S::Shocks, R::Results)
                 L_today = (1.0-u_b)*eps_h
             end
             K_tomorrow = exp(K_tomorrow)
-            
+
             # See that K_tomorrow likely does not fall on our K_grid...this is why we need to interpolate!
             i_Kp = get_index(K_tomorrow, K_grid)
             w_today = (1.0-cALPHA)*z_today*(K_today/L_today)^cALPHA
@@ -320,7 +320,7 @@ function get_index(val::Float64, grid::Array{Float64,1})
     index = optimize(find_index, 1.0, length(grid)).minimizer
     index
 end
-# function  get_index(val::Float64, grid::Array{Float64,1}) 
+# function  get_index(val::Float64, grid::Array{Float64,1})
 #     interp =  interpolate(grid, BSpline(Linear()))
 #     abs_find(k) = abs(interp(k) - val)
 #     index =searchsorted(grid,val)
