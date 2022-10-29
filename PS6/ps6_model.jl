@@ -96,6 +96,13 @@ function VFI(P::Params)
         #Then we want to solve the static labor problem
 end
 
+function Entval()
+  for i = 1:n_s
+      W += val_func[i]*v_s_entrant[i]
+  end
+  return W_ent
+end
+
 function solve_HR()
     p0 = p_star
     convergence = 0
