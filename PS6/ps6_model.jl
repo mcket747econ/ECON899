@@ -1,4 +1,5 @@
-Original_agrid=1;
+#Original_agrid=1;
+using Optim, Plots, Parameters, Distributions, Random, DataFrames
 
 @with_kw struct Params
 
@@ -12,11 +13,12 @@ Original_agrid=1;
     s_grid::Array{Float64,1} = [3.98e-4, 3.58, 6.82, 12.18, 18.79]
     n_s::Int64 = length(s_grid)
     emp_levels::Array{Float64,1} = [1.3e-9, 10, 60, 300, 1000]
-    F_transition::Array{Float64,5} = [0.6598 0.2600 0.0416 0.0331 0.0055;
+    F_transition::Array{Float64,2} = [0.6598 0.2600 0.0416 0.0331 0.0055;
                                       0.1997 0.7201 0.0420 0.0326 0.0056;
                                       0.2000 0.2000 0.5555 0.0344 0.0101;
                                       0.2000 0.2000 0.2502 0.3397 0.0101;
                                       0.2000 0.2000 0.2500 0.3400 0.0100]
+
     v_s_entrant::Array{Float64,1} =[0.37,0.4631,0.1102,0.0504,0.0063]
     tau::Float64=0;
 
@@ -28,41 +30,85 @@ Original_agrid=1;
     sigma_logz::Float64=sqrt(0.53);
     sigma_epsilon::Float64=sqrt((1-rho)*((sigma_logz)^2));
     a::Float64=0.078;
-end
-
-
-mutable struct results
-    val_func::Array{Float64,2} =
-    lab_func::Array{Float64,2}
-
-
-
-
-
-
-
 
 end
 
-function profit()
-    prof_0 = 0
-    for i = 1:n_s
-        prof = p*s_grid[i]*n^(theta) - n - p*c_f
-        if prof> prof_0
-            prof_0 = prof
-        end
-    end
+
+mutable struct Results
+    val_func::Array{Float64,1}
+    pf_n_func::Array{Float64,1}
+    pf_prof::Array{Float64,1}
+    p_star::Float64
+
+
+
+
+
+
+
+
+
+
 end
+
+function Initialize()
+    P = Params()
+    val_func = zeros(P.n_s)
+    pf_n_func = zeros(P.n_s)
+    pf_prof = zeros(P.n_s)
+    p_star = 0.738
+    R = Results(val_func,pf_n_func,pf_prof,p_star)
+    return P, R
+
+end
+P,R = Initialize()
+function n_star(s,theta,p_star,s_grid)
+    n = ((1/theta)*p_star*s_grid[s])^((1/theta)-1)
+    return n
+end
+function profit(P::Params,R::Results,i)
+    @unpack p_star,pf_n_func, val_func = R
+    @unpack s_grid, cf, theta, n_s = P
+    #prof_0 = 0
+    #for i = 1:n_s
+        #n = ((1/theta)*p_star*s_grid[i])^((1/theta)-1)
+    prof_1 = p_star*s_grid[i]*n_star(i,theta,p_star,s_grid)^(theta) - n_star(i,theta,p_star,s_grid) - p_star*cf
+        #opt = optimize(prof_1,0,100)
+        #pf_n[i] = n
+        #prof = -opt.minimum()
+        #pf_prof[i] = prof
+        # if prof> prof_0
+        #     prof_0 = prof
+        #     pf_prof[i] = prof
+        # end
+
+    return prof_1
+end
+prof = profit(P,R,1)
 
 
 
 function VFI(P::Params)
     @unpack n_s = P
     for i = 1:n_s
-        val_func[i] =
+        val_func = profit(P, R,i) + beta*sum()
+
         #Then we want to solve the static labor problem
+end
+
+function solve_HR()
+    p0 = p_star
+    convergence = 0
+    while converge == 0
+        W,x = VFI()
 
 
+
+
+
+
+
+    end
 
 
 
@@ -70,6 +116,8 @@ function VFI(P::Params)
 
 
 end
+
+
 
 function Tauchen(mew,sigmasq,rho,znum,q, tauchenoptions, dshift)
 
@@ -201,3 +249,4 @@ disp('Calculating price vector corresponding to the stationary eqm')
 [V,Policy,ExitPolicy]=ValueFnIter_Case1(n_d,n_a,n_z,d_grid,a_grid,z_grid, pi_z, ReturnFn, Params, DiscountFactorParamNames, ReturnFnParamNames, vfoptions);
 Params.zeta=1-ExitPolicy;
 StationaryDist=StationaryDist_Case1(Policy,n_d,n_a,n_z,pi_z, simoptions,Params,EntryExitParamNames);
+
