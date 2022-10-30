@@ -1,3 +1,5 @@
+nes (159 sloc)  5.03 KB
+
 #Original_agrid=1;
 using Optim, Plots, Parameters, Distributions, Random, DataFrames
 
@@ -118,7 +120,7 @@ R.val_func, pf_entry_x = VFI(P,R)
 
 
 function Entval(R::Results,P::Params)
-    @unpack n_s = P 
+    @unpack n_s = P
     @unpack val_func =  R
     for i = 1:n_s
         W += val_func[i]*v_s_entrant[i]
@@ -148,20 +150,52 @@ function solve_HR(P::Params,R::Results,tol=1e-3)
     end
     m0 = m_init
     convergence_mass = 0
-    while convergence_mass == 0
-        mu = StatDist()
-        Ld,Ls = LMC(mu,m,p1)
+    while convergence_mass = 0
+            StatDist(P,R,m0)
+        Ld,Ls = LBMC(mu,m,p1)
         if abs(Ld-Ls)>tol
+            if Ld>Ls
+                m_new = m0 - .01*m0
+            elseif Ld <Ls
+                m_new = m0 + .01*m0
+            end
+        elseif abs(Ld-Ls)<tol
+            convergemce_mass = 1
         end
     end
-    return p1 ## Add return 
-end 
-function StatDist()
-    mu_p = sum((1-pf_entry_x(s))*F_transition[s,s']*mu(s;m))+ m*sum((1-pf_entry_x(s))*F_transition[s,sp]*v_s_entrant)
+    return p1 ## Add return
 end
+function StatDist(P::Params,R::Results,m,tol::Float64 = 1e-3)
+    @unpack n_s,F_transition,v_s_entrant = P
+    @unpack mu_0  = R
+    error=100
+
+    mu_p = zeros(n_s)
+    while error>tol
+        for i in 1:n_s
+            for ip in 1:n_s
+                mu_p[i] += (1-pf_entry_x[i])*F_transition[i,ip]*mu_0[i]+ m*(1-pf_entry_x[i])*F_transition[i,ip]*v_s_entrant[i]
+            end
+            mu_p
+        end
+        error = maximum(abs.(mu_p - mu_0))
+        mu_0 = mu_p
+    end
+end
+StatDist(P,R,1)
 
 
-function LMBC() ##Labor market clearning
+function LBMC(P::Params, R::Results,m)
+    @unpack theta, A = P
+    @unpack p_star, s_grid, m_0 = R##Labor market clearning
+    L_d = 0
+    for i = 1:n_s
+        L_d += n_star(i,theta,p_star,s_grid)*mu_0[i] +m*(n_star(i,theta,p_star,s_grid)*pf_entry_x[i])
+        profit_temp += profit(i)*mu_0[i] + m*(profit(i)*pf_entry_x[i])
+    end
+    L_s = 1/A - profit_temp
+    return L_d, L_s
+
 end
 
 # function Tauchen(mew,sigmasq,rho,znum,q, dshift::Float64=1)
