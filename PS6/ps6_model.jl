@@ -117,8 +117,9 @@ R.val_func, pf_entry_x = VFI(P,R)
 
 
 
-function Entval(R::Results)
-     @unpack val_func =  R
+function Entval(R::Results,P::Params)
+    @unpack n_s = P 
+    @unpack val_func =  R
     for i = 1:n_s
         W += val_func[i]*v_s_entrant[i]
     end
@@ -133,8 +134,8 @@ function solve_HR(P::Params,R::Results,tol=1e-3)
     p0 = p_star
     convergence = 0
     while converge == 0
-        R.val_func,pf_entry_x = VFI()
-        W = Entval(R)
+        R.val_func,pf_entry_x = VFI(P,R)
+        W = Entval(R,P)
         if abs(W - p0*ce) > tol
             if W > p0*ce
                 p1 = p0 + ((1-p0)/2)
