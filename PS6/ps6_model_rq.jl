@@ -31,6 +31,7 @@ using Optim, Plots, Parameters, Distributions, Random, DataFrames
     sigma_logz::Float64=sqrt(0.53);
     sigma_epsilon::Float64=sqrt((1-rho)*((sigma_logz)^2));
     a::Float64=0.078;
+    gamma_e::Float64=0.5772156649
      #Distribution of Entrants
 
 end
@@ -75,7 +76,7 @@ prof = profit(P,R,1)
 
 function Utility(p::Float64,P::Params,R::Results,α::Float64=1)  ##utility
     @unpack γE= P
-    @unpack val_func= R 
+    @unpack val_func= R
     c= 10
     for is in 0:n_s
         γE/α + (1/α)*(c+log(exp(α*val_func[is]-c)))
@@ -106,7 +107,7 @@ end
 #     @unpack n_s, F_transition, beta= P
 #     @unpack val_func, pf_entry_x = R
 #     for is = 1:n_s
-#         wint = beta*sum(val_func[:].*F_transition[is,:]) 
+#         wint = beta*sum(val_func[:].*F_transition[is,:])
 #         if wint > 0
 #             val_func[i] = profit(P,R,i)+wint
 #             pf_entry_x[i] = 0
@@ -122,7 +123,7 @@ R.val_func, pf_entry_x = VFI(P,R)
 
 
 function Entval(R::Results,P::Params)
-    @unpack n_s = P 
+    @unpack n_s = P
     @unpack val_func =  R
     for i = 1:n_s
         W += val_func[i]*v_s_entrant[i]
@@ -216,12 +217,12 @@ function solve_HR(P::Params,R::Results,tol=1e-3)
             else
                 m0+=m_step
             end
-        else 
+        else
             convergence_mass=1
         end
     end
-    return p1,mu,m0 ## Add return 
-end 
+    return p1,mu,m0 ## Add return
+end
 
 function solve_HR2(P::Params,R::Results,tol=1e-3)
     @unpack val_func = R
@@ -250,8 +251,20 @@ function solve_HR2(P::Params,R::Results,tol=1e-3)
             else
                 m0+=m_step
             end
-        else 
+        else
             convergence_mass=1
         end
-    return p1,mu,m0 ## Add return 
-end 
+    return p1,mu,m0 ## Add return
+end
+
+
+function EVS()
+    u_0 = zeros(n_s)
+    for i =1:n_s
+        val_func_in = profit({,R,i}) + beta *sum(u_0[:].*F_transition[i,:])
+        val_funcOut = profit(P,R,i)
+    end
+    U_1[i] = (gamma_e/alpha_1) +(1/alpha_1)*log((e^(alpha_1*val_func_in[i])+e^(alpha_1*val_func_out[i])))
+
+
+end
