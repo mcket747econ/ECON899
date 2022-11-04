@@ -12,19 +12,19 @@
 
 using StatFiles, DataFrames, LinearAlgebra 
 
-cd("/Users/jacobbills/Desktop/Economics/Econ 899/JF 1/")
+#cd("/Users/jacobbills/Desktop/Economics/Econ 899/JF 1/")
 
-data = DataFrame(load("Mortgage_performance_data.dta"))
+#data = DataFrame(load("Mortgage_performance_data.dta"))
 
-y = data[!,20]
-y = Array(y)
-ind = ["i_large_loan", "i_medium_loan" , "rate_spread" , "i_refinance", "age_r", "cltv", "dti", "cu" , "first_mort_r", "score_0", "score_1", "i_FHA", "i_open_year2", "i_open_year3", "i_open_year4", "i_open_year5"]
-x = data[!,ind]
-insertcols!(x, 17, :const => 1) #add a constant
-x = Matrix(x)
-β::Array{Float64,1}
-β = zeros(size(x,2)) #I counted sixteen variables in the problem set, plus a constant
-β[17] = -1 #if I understand the problem right
+#y = data[!,20]
+#y = Array(y)
+#ind = ["i_large_loan", "i_medium_loan" , "rate_spread" , "i_refinance", "age_r", "cltv", "dti", "cu" , "first_mort_r", "score_0", "score_1", "i_FHA", "i_open_year2", "i_open_year3", "i_open_year4", "i_open_year5"]
+#x = data[!,ind]
+#insertcols!(x, 17, :const => 1) #add a constant
+#x = Matrix(x)
+#β::Array{Float64,1}
+#β = zeros(size(x,2)) #I counted sixteen variables in the problem set, plus a constant
+#β[17] = -1 #if I understand the problem right
 
 ##Question 1 
 

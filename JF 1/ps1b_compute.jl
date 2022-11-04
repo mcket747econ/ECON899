@@ -1,4 +1,4 @@
-using StatFiles, DataFrames, Optim, LinearAlgebra
+using StatFiles, DataFrames, Optim, LinearAlgebra, LatexPrint
 
 cd("/Users/jacobbills/Desktop/Economics/Econ 899/JF 1/")
 include("ps1b_model.jl") #source of functions
@@ -11,8 +11,7 @@ ind = ["i_large_loan", "i_medium_loan" , "rate_spread" , "i_refinance", "age_r",
 x = data[!,ind]
 insertcols!(x, 17, :const => 1) 
 x = Matrix(x)
-β::Array{Float64,1}
-β = zeros(size(x,2)) #I counted sixteen variables in the problem set, plus a constant
+β::Array{Float64,1} = zeros(size(x,2)) #I counted sixteen variables in the problem set, plus a constant
 β[17] = -1 #if I understand the problem right
 
 
@@ -23,6 +22,10 @@ ll1, score1, H1 = evaluate_b(β,y,x)
 println("The Log-Likelihood is ", ll1)
 println("The score of the LL is: ", score1)
 println("The Hessian of the LL is: ", H1)
+
+
+lap(score1) #LaTeX printout of score
+tabular(round.(H1,digits=2)) #LaTeX printout of Hessian
 
 ##Question 2 (not sure how to approach this)
 
@@ -43,3 +46,7 @@ println("The BFGS coefficients are: ", b4a)
 @time optb = optimize(fun, β, NelderMead(), Optim.Options(iterations=5000)) #Simplex method, up-ed the number of iterations so it wouldn't fail 
 b4b = Optim.minimizer(optb) #get coefficients 
 println("The Simplex coefficients are: ", b4b)
+
+println(norm(b4a-b3))
+
+println(norm(b4b-b3))
