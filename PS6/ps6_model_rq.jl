@@ -43,6 +43,7 @@ mutable struct Results
     pf_entry_x::Array{Float64,1}
     mu_0::Array{Float64,1}
     M::Float64
+    N_d::Array{Float64,1}
 end
 
 function Initialize()
@@ -52,9 +53,10 @@ function Initialize()
     pf_n_func = zeros(P.n_s)
     pf_prof = zeros(P.n_s)
     pf_entry_x = zeros(P.n_s)
+    N_d = zeros(P.n_s)
     p_star = 0.738
     mu_0 = ones(P.n_s)/P.n_s
-    R = Results(val_func_in,val_func_out,pf_n_func,pf_prof,p_star,pf_entry_x,mu_0,1)
+    R = Results(val_func_in,val_func_out,pf_n_func,pf_prof,p_star,pf_entry_x,mu_0,1,N_d)
     return P, R
 end
 P,R = Initialize()
@@ -62,21 +64,19 @@ function n_star(s,θ,p_star)
     n = ((1/θ)*p_star*s)^((1/θ)-1)
     return n
 end
-function profit(P::Params,R::Results,is)
+function profit(P::Params,R::Results,s)
     @unpack p_star,pf_n_func, val_func = R
-    @unpack s_grid, cf, θ, n_s = P
-    s = s_grid[is]
+    @unpack cf, θ, n_s = P
     nopt=n_star(s,θ,p_star)
     prof_1 = p_star*s*nopt^(θ) - nopt - p_star*cf
     return prof_1
 end
 prof = profit(P,R,1)
-
-function Utility(P::Params,R::Results,α::Float64=1,val_func_0,val_func_1)  ##utility
+function Utility(P::Params,R::Results,val_func_0,val_func_1,α::Float64=1)  ##utility
     @unpack γE= P
     @unpack val_func= R
     c= (val_func_0+val_func_1)/2
-    γE/α + (1/α)*(c+log(exp(α*val_func_0-c) + exp(α*val_func_1-c))), exp(α * (val_func_1 -c))/(exp(α * (val_func_0 - c)) + exp(α * (val_func_1 - c)))
+    γE/α + (1/α)*sum(c+log(exp(α*val_func_0-c) + exp(α*val_func_1-c))), exp(α * (val_func_1 -c))/(exp(α * (val_func_0 - c)) + exp.(α * (val_func_1 - c)))
 end
 
 function VFI(P::Params,R::Results)
@@ -100,7 +100,7 @@ function VFI(P::Params,R::Results)
         #Then we want to solve the static labor problem
 end
 
-function VFI_shocks(P::Params,R::Results)
+function VFI_shocks(P::Params,R::Results,α)
     @unpack n_s, F_transition, β= P
     @unpack pf_prof = R
     val_func = zeros(n_s)
@@ -110,15 +110,15 @@ function VFI_shocks(P::Params,R::Results)
     for i = 1:n_s
         val_func_0[i] = profit(P,R,i) + β*sum(val_func[:].*F_transition[i,:])
         val_func_1[i] += profit(P,R,i)
-        val_func[i],pf_entry_x[i] = Utility(P,R,α,val_func_0,val_func_1)
+        val_func[i],pf_entry_x[i] = Utility(P,R,val_func_0[i],val_func_1[i],α)
     end
     return val_func, pf_entry_x
         #Then we want to solve the static labor problem
 end
 
-function VFI_Star(prim::Primitives, res::Results)
-    @unpack ns, F, v_s_entrant = prim
-    @unpack pf_entry_x, val_func, mu, M = res
+function VFI_Star(P::Params, R::Results)
+    @unpack ns, F, v_s_entrant = P
+    @unpack pf_entry_x, val_func, mu, M = R
 
     muprime = zeros(ns)
     for is = 1:ns
@@ -149,8 +149,9 @@ end
 R.val_func, pf_entry_x = VFI(P,R)
 
 function Entval(R::Results,P::Params)
-    @unpack n_s = P
+    @unpack n_s, v_s_entrant = P
     @unpack val_func =  R
+    W=0
     for i = 1:n_s
         W += val_func[i]*v_s_entrant[i]
     end
@@ -159,22 +160,37 @@ end
 
 function StatDist(R::Results,P::Params)
     @unpack pf_entry_x = R
-    @unpack F_transition = P
+    @unpack F_transition, n_s = P
     for is in 1:n_s
         mu_p = sum((1-pf_entry_x(s))*F_transition[s,s']*mu(s;m))+ m*sum((1-pf_entry_x(s))*F_transition[s,sp]*v_s_entrant)
     end
+    mu_p
 end
 
 
-function LMC(mu,M) ##Labor market clearing
+# function LMC(mu,M) ##Labor market clearing
+#     @unpack n_s,v_s,s_grid,A = P
+#     @unpack mu_0,p_star,M = R
+#     L_d::Float64 = 0.0
+#     Π::Float64=0.0
+#     for is =  1:n_s
+#         n_opt = n_star(s_grid[is],p_star)
+#         L_d+=n_opt*mu[is] + M*n_opt*v_s[is]
+#         Π = profit(P,R)*mu[is] + m*prof(P,R)*v_s[is]
+#     end
+#     L_s = 1/A - Π
+#     return L_d,L_s
+# end
+
+function LMC(P::Params,R::Results) ##Labor market clearing
     @unpack n_s,v_s,s_grid,A = P
-    @unpack mu_0,p_star,M = R
+    @unpack N_d,mu_0,p_star,M = R
     L_d::Float64 = 0.0
     Π::Float64=0.0
     for is =  1:n_s
-        n_opt = n_star(s_grid[is],p_star)
+        n_opt = N_d[is]
         L_d+=n_opt*mu[is] + M*n_opt*v_s[is]
-        Π = profit(P,R)*mu[is] + m*prof(P,R)*v_s[is]
+        Π = profit(P,R,s_grid[is])*mu[is] #+ M*prof(P,R)*v_s[is]
     end
     L_s = 1/A - Π
     return L_d,L_s
@@ -211,8 +227,78 @@ function dist_iterate(prim::Params, res::Results, tol::Float64 = 1e-3)
 
 end
 
+function solve_firm_prob(R::Results,P::Params,α,tol = 1e-3)
+    @unpack n_s, s_grid = P
 
+    n = 1
+    err = 100.0
 
+    N_d = zeros(n_s)
+    pf_prof = zeros(n_s)
+    for is = 1:n_s
+        # print(profit(P, R, s_grid[is]))
+        N_d[is] = profit(P, R, s_grid[is])
+        N_d[is] = n_star(s_grid[is],P.θ,R.p_star)
+        pf_prof[is] = profit(P, R, s_grid[is])
+    end
+    R.N_d = N_d
+    R.pf_prof = pf_prof
+    while true
+        if α == 0.0
+            val_func_next, pf_entry_x = VFI(P, R)
+        else
+            val_func_next, pf_entry_x = VFI_shocks(P, R, α)
+        end
+        err = maximum(abs.(R.val_func .- val_func_next))
+        # println("\n***** ", n, "th iteration *****")
+        # @printf("Absolute difference: %0.4f.\n", float(err))
+        # println("***************************")
+        if err < tol
+            break
+        end
+        R.pf_entry_x = pf_entry_x
+        R.val_func = val_func_next
+        n += 1
+
+        end
+end
+
+function stationary_price(P::Params, R::Results, α::Float64)
+    @unpack val_func = R
+    @unpack cf, ce,lambda,p_star = P
+
+    p0 = p_star
+    converge = 0
+    while converge == 0
+        R.val_func,pf_entry_x = VFI(P,R)
+        W = Entval(R,P)
+        if abs(W - p0*ce) > tol
+            if W > p0*ce
+                p1 = p0 + ((1-p0)/2)
+            else
+                p1 = p0 - ((1-p0)/2)
+            end
+        else
+            converge = 1
+        end
+    end
+    m0 = m_init
+    convergence_mass = 0
+    while convergence_mass == 0
+        mu = StatDist(R,P)
+        Ld,Ls = LMC(mu,m,p1)
+        if abs(Ld-Ls)>tol
+            if Ld>Ls
+                m0-=m_step
+            else
+                m0+=m_step
+            end
+        else
+            convergence_mass=1
+        end
+    end
+end
+##
 function solve_HR(P::Params,R::Results,tol=1e-3)
     @unpack val_func = R
     @unpack cf, ce,lambda,p_star = P
