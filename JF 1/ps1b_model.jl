@@ -20,32 +20,37 @@ y = data[!,20]
 y = Array(y)
 ind = ["i_large_loan", "i_medium_loan" , "rate_spread" , "i_refinance", "age_r", "cltv", "dti", "cu" , "first_mort_r", "score_0", "score_1", "i_FHA", "i_open_year2", "i_open_year3", "i_open_year4", "i_open_year5"]
 x = data[!,ind]
-insertcols!(x, 17, :const => 1) 
+insertcols!(x, 17, :const => 1) #add a constant
 x = Matrix(x)
+β::Array{Float64,1}
 β = zeros(size(x,2)) #I counted sixteen variables in the problem set, plus a constant
 β[17] = -1 #if I understand the problem right
 
 ##Question 1 
-function LL(beta,y,X) #takes in an input matrix of betas, seems to work 
-    N = size(y,1) #number of observations
-    li = zeros(N) #initialize output vector
-    for i in 1:N 
-        li[i] = -log(1+exp(X[i,:]'*beta))+y[i]*X[i,:]'*beta #formula for log-Likelihood
-    end
-    l = sum(li) #log-Likelihood is a single number 
-    return l
-end 
 
-function sx(beta,X) #just a formula I will use a lot 
-    1/(1+exp(-X'*beta))
+function LL(beta,y,X) #takes in an input matrix of betas, seems to work 
+    N::Int64 = size(y,1) #number of observations
+    li::Array{Float64,1} = zeros(N) #initialize output vector
+    for i in 1:N
+        v = convert(Vector{Float64},X[i,:]) #typing reduces memory allocation 
+        li[i] = -log(1+exp(v'*beta))+y[i]*v'*beta #formula for log-Likelihood
+    end
+    l::Float64 = sum(li) #log-Likelihood is a single number 
+    return l
+end
+
+function sx(beta,X) #just a formula I will use a lot
+    s::Float64 = 1/(1+exp(-X'*beta))
+    return s
 end
 
 function score_LL(beta,y,X) #score is first derivatives with respect to beta
     N,K = size(X) #number of observations  
     sl = zeros(K,N) #initialize output array 
     for i in 1:N
-        s = y[i]-sx(beta,X[i,:])  
-        sl[:,i] = s*X[i,:]' # general formula 
+        v= convert(Vector{Float64},X[i,:])
+        s::Float64 = y[i]-sx(beta,v)  
+        sl[:,i] = s*v' # general formula 
     end
     score::Array{Float64,1} = zeros(K)
     for k in 1:K
@@ -60,8 +65,9 @@ function hessian(beta,X) #hessian is second derivatives wrt beta
     Hl = zeros(K,K,N) #begin with 3 dimensions
     H = zeros(K,K) #final result is a KxK matrix formed from the sums of each element 
     for i in 1:N
-        s = sx(beta,X[i,:])
-        Hl[:,:,i] = X[i,:]*X[i,:]'.*s.*(1-s) #most of the formula 
+        v= convert(Vector{Float64},X[i,:])
+        s = sx(beta,v)
+        Hl[:,:,i] = v*v'.*s.*(1-s) #most of the formula 
         H += Hl[:,:,i] #getting rid of the number of observations dimension 
     end 
     H = -H
@@ -78,6 +84,7 @@ end
 function newton(beta, y, X, tol::Float64 = 1e-9, step::Float64 = .5)
     b0 = beta 
     flag = 0 #convergence flag
+    bk::Array{Float64,1} = zeros(size(X,2))
     while flag == 0 #iterate until converged 
         ll, score, H = evaluate_b(b0,y,X)
         bk = b0 - H^(-1)*score
@@ -85,7 +92,7 @@ function newton(beta, y, X, tol::Float64 = 1e-9, step::Float64 = .5)
             b0 = bk 
             flag = 1 #update convergence flag 
         else 
-            b0 = bk #add in a step maybe? 
+            b0 = bk #add in a step maybe? Doesn't seem needed
         end 
     end
     ll = LL(b0,y,X)

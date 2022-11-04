@@ -11,6 +11,7 @@ ind = ["i_large_loan", "i_medium_loan" , "rate_spread" , "i_refinance", "age_r",
 x = data[!,ind]
 insertcols!(x, 17, :const => 1) 
 x = Matrix(x)
+β::Array{Float64,1}
 β = zeros(size(x,2)) #I counted sixteen variables in the problem set, plus a constant
 β[17] = -1 #if I understand the problem right
 
