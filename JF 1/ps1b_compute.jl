@@ -34,11 +34,11 @@ println("The log-likelihood is ", ll3)
 
 #Question 4
 
-fun(b) = LL(b,y,x) #define a new function for the purposes of minimizing only β
+fun(b) = -LL(b,y,x) #define a new function for the purposes of minimizing only β
 @time opta = optimize(fun, β, BFGS()) #optimize the function using BFGS 
 b4a = Optim.minimizer(opta) #get coefficients 
 println("The BFGS coefficients are: ", b4a)
 
-@time optb = optimize(fun, β, NelderMead()) #Simplex method 
+@time optb = optimize(fun, β, NelderMead(), Optim.Options(iterations=5000)) #Simplex method, up-ed the number of iterations so it wouldn't fail 
 b4b = Optim.minimizer(optb) #get coefficients 
-println("The Simplex coefficients are: ", b4b)
+Sprintln("The Simplex coefficients are: ", b4b)
