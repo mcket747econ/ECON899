@@ -41,4 +41,4 @@ println("The BFGS coefficients are: ", b4a)
 
 @time optb = optimize(fun, β, NelderMead(), Optim.Options(iterations=5000)) #Simplex method, up-ed the number of iterations so it wouldn't fail 
 b4b = Optim.minimizer(optb) #get coefficients 
-Sprintln("The Simplex coefficients are: ", b4b)
+println("The Simplex coefficients are: ", b4b)
