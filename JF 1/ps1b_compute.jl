@@ -1,4 +1,4 @@
-using StatFiles, DataFrames, Optim, LinearAlgebra, LatexPrint
+using StatFiles, DataFrames, Optim, LinearAlgebra, LatexPrint, ForwardDiff, CSV
 
 cd("/Users/jacobbills/Desktop/Economics/Econ 899/JF 1/")
 include("ps1b_model.jl") #source of functions
@@ -30,6 +30,14 @@ tabular(round.(H1,digits=2)) #LaTeX printout of Hessian
 ##Question 2 (not sure how to approach this)
 
 
+g, h = q2(β,y,x) #function defined to do question 2 
+
+println(norm(g-score1)) #how different are the vectors? Not very! 
+println(norm(h-H1))
+
+
+
+
 #Question 3 
 @time b3, ll3= newton(β, y, x)
 
@@ -50,3 +58,15 @@ println("The Simplex coefficients are: ", b4b)
 println(norm(b4a-b3))
 
 println(norm(b4b-b3))
+
+#Print Results
+CSV.write("q1_score.csv", DataFrame([score1],[:col1])) 
+CSV.write("q1_hessian.csv",DataFrame(H1, :auto))
+
+CSV.write("q2_first.csv", DataFrame([g],[:col1])) 
+CSV.write("q2_second.csv", DataFrame(h, :auto))
+
+CSV.write("q3_coef.csv", DataFrame([b3],[:col1]))
+
+CSV.write("q4_BFGS.csv", DataFrame([b4a],[:col1]))
+CSV.write("q4_Simplex.csv", DataFrame([b4b],[:col1]))
