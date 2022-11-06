@@ -1,9 +1,9 @@
-#Original_agrid=1;
+
 using Optim, Plots, Parameters, Distributions, Random, DataFrames
 
 @with_kw struct Params
     β::Float64=0.8;
-    A::Float64=0.6;     ##Heejin used as 1/200 ?
+    A::Float64=1/200;     ##Heejin used as 1/200 ?
     γE::Float64=0.5772156649;
 
     θ::Float64=0.64;
@@ -21,7 +21,7 @@ using Optim, Plots, Parameters, Distributions, Random, DataFrames
     
     emp_levels::Array{Float64,1} = [1.3e-9, 10, 60, 300, 1000]
     tau::Float64=0;
-    p_star::Float64=0.738;
+    p_star::Float64=1.0;
     w::Float64=1;
     lambda::Float64 =.99;
     rho::Float64=0.93;
@@ -54,99 +54,88 @@ function Initialize()
     pf_prof = zeros(P.n_s)
     pf_entry_x = zeros(P.n_s)
     N_d = zeros(P.n_s)
-    p_star = 0.738
-    mu_0 = ones(P.n_s)/P.n_s
-    R = Results(val_func_in,val_func_out,pf_n_func,pf_prof,p_star,pf_entry_x,mu_0,1,N_d)
+    p_star = 1.0
+    mu_0 = ones(P.n_s)     #/P.n_s
+    R = Results(val_func_in,val_func_out,pf_n_func,pf_prof,p_star,pf_entry_x,mu_0,5.0,N_d)
     return P, R
 end
 P,R = Initialize()
 function n_star(s,θ,p_star)
-    n = ((1/θ)*p_star*s)^((1/θ)-1)
+    n = (θ*p_star*s)^(1/(1-θ))
+    if n < 0
+        n=0
+    end
     return n
 end
 function profit(P::Params,R::Results,s)
-    @unpack p_star,pf_n_func, val_func = R
-    @unpack cf, θ, n_s = P
+    @unpack p_star = R
+    @unpack cf, θ = P
     nopt=n_star(s,θ,p_star)
     prof_1 = p_star*s*nopt^(θ) - nopt - p_star*cf
     return prof_1
 end
-prof = profit(P,R,1)
+
 function Utility(P::Params,R::Results,val_func_0,val_func_1,α::Float64=1)  ##utility
     @unpack γE= P
     @unpack val_func= R
     c= (val_func_0+val_func_1)/2
-    γE/α + (1/α)*sum(c+log(exp(α*val_func_0-c) + exp(α*val_func_1-c))), exp(α * (val_func_1 -c))/(exp(α * (val_func_0 - c)) + exp.(α * (val_func_1 - c)))
+    γE/α + (1/α)*(c+log(exp(α*val_func_0-c) + exp(α*val_func_1-c))), 
+    exp(α * (val_func_1 -c))/(exp(α * (val_func_0 - c)) + exp(α * (val_func_1 - c)))
 end
 
 function VFI(P::Params,R::Results)
     @unpack n_s, F_transition, β= P
-    val_func = zeros(n_s)
-    pf_entry_x = zeros(n_s)
+    @unpack val_func, pf_prof = R
+
+    pf_entry_x_out = zeros(n_s)
     val_func_in = zeros(n_s)
     val_func_out = zeros(n_s)
+    val_func_next = zeros(n_s)
     for i = 1:n_s
-        val_func_in[i] = profit(P,R,i) + β*sum(val_func[:].*F_transition[i,:])
-        val_func_out[i] += profit(P,R,i)
-        if val_func_in[i] > val_func_out[i]
-            val_func[i] = val_func_in[i]
-            pf_entry_x[i] = 0
+        val_func_out[i] = pf_prof[i]
+        val_func_in[i] =  pf_prof[i]+ β*sum(val_func[:].*F_transition[i,:])
+        if val_func_in[i] >= val_func_out[i]
+            val_func_next[i] = val_func_in[i]
+            pf_entry_x_out[i] = 0
         else
-            val_func[i] = val_func_out[i]
-            pf_entry_x[i] = 1
+            val_func_next[i] = val_func_out[i]
+            pf_entry_x_out[i] = 1
         end
     end
-    return val_func, pf_entry_x
+    return val_func_next, pf_entry_x_out
         #Then we want to solve the static labor problem
 end
 
 function VFI_shocks(P::Params,R::Results,α)
     @unpack n_s, F_transition, β= P
-    @unpack pf_prof = R
-    val_func = zeros(n_s)
-    pf_entry_x = zeros(n_s)
+    @unpack pf_prof,val_func = R
+    pf_entry_tmp = zeros(n_s)
     val_func_1 = zeros(n_s)
     val_func_0 = zeros(n_s)
     for i = 1:n_s
-        val_func_0[i] = profit(P,R,i) + β*sum(val_func[:].*F_transition[i,:])
-        val_func_1[i] += profit(P,R,i)
-        val_func[i],pf_entry_x[i] = Utility(P,R,val_func_0[i],val_func_1[i],α)
+        val_func_0[i] =pf_prof[i] + β*sum(val_func[:].*F_transition[i,:])
+        val_func_1[i] = pf_prof[i]
+        val_func[i],pf_entry_tmp[i] = Utility(P,R,val_func_0[i],val_func_1[i],α) 
     end
-    return val_func, pf_entry_x
+    return val_func, pf_entry_tmp
         #Then we want to solve the static labor problem
 end
 
 function VFI_Star(P::Params, R::Results)
-    @unpack ns, F, v_s_entrant = P
-    @unpack pf_entry_x, val_func, mu, M = R
+    @unpack n_s, F_transition, v_s_entrant = P
+    @unpack pf_entry_x, val_func, mu_0, M = R
 
-    muprime = zeros(ns)
-    for is = 1:ns
-        for isp = 1:ns
-            muprime[sp_index] += (1 - pf_entry_x[is]) * mu[is] * 
-            F[is, isp] + (1 - pf_entry_x[is]) *
-            F[is, isp] * M * v_s_entrant[is]
+    muprime = zeros(n_s)
+    for is = 1:n_s
+        for isp = 1:n_s
+            muprime[isp] += (1 - pf_entry_x[is]) * mu_0[is] * 
+            F_transition[is, isp] + (1 - pf_entry_x[is]) *
+            F_transition[is, isp] * M * v_s_entrant[is]
         end
     end
     muprime
 end
 
-# function VFI(P::Params,R::Results)
-#     @unpack n_s, F_transition, β= P
-#     @unpack val_func, pf_entry_x = R
-#     for is = 1:n_s
-#         wint = β*sum(val_func[:].*F_transition[is,:])
-#         if wint > 0
-#             val_func[i] = profit(P,R,i)+wint
-#             pf_entry_x[i] = 0
-#         else
-#             val_func[i] = profit(P,R,i)
-#             pf_entry_x[i] = 1
-#         end
-#     end
-#     return val_func, pf_entry_x
-# end
-R.val_func, pf_entry_x = VFI(P,R)
 
 function Entval(R::Results,P::Params)
     @unpack n_s, v_s_entrant = P
@@ -158,39 +147,46 @@ function Entval(R::Results,P::Params)
     return W
 end
 
-function StatDist(R::Results,P::Params)
-    @unpack pf_entry_x = R
-    @unpack F_transition, n_s = P
-    for is in 1:n_s
-        mu_p = sum((1-pf_entry_x(s))*F_transition[s,s']*mu(s;m))+ m*sum((1-pf_entry_x(s))*F_transition[s,sp]*v_s_entrant)
+function StatDist(R::Results,P::Params,tol=1e-3)
+    n=0
+    # mu_p =0.0
+    while true
+        # mu_p = sum((1-pf_entry_x(s))*F_transition[s,s']*mu(s;m))+ m*sum((1-pf_entry_x(s))*F_transition[s,sp]*v_s_entrant)
+        mu_p= VFI_Star(P,R)
+        diff = maximum(abs.(mu_p.-R.mu_0))
+        if diff<tol 
+            break
+        end 
+        R.mu_0 = mu_p
+        n+=1
+        # println(diff)
+        if n==500
+            println("mu_p is",mu_p,"; mu is",mu_0)
+            break
+        end
+        if n%40==0
+            println("mu_p is",mu_p,"    -   mu is",mu_0)
+            println("n is",n,"    -    mu is",mu_0)
+            break
+        end
+        # if n==2000
+        #     return mu_p
+        #     break
+        # end
     end
     mu_p
 end
 
 
-# function LMC(mu,M) ##Labor market clearing
-#     @unpack n_s,v_s,s_grid,A = P
-#     @unpack mu_0,p_star,M = R
-#     L_d::Float64 = 0.0
-#     Π::Float64=0.0
-#     for is =  1:n_s
-#         n_opt = n_star(s_grid[is],p_star)
-#         L_d+=n_opt*mu[is] + M*n_opt*v_s[is]
-#         Π = profit(P,R)*mu[is] + m*prof(P,R)*v_s[is]
-#     end
-#     L_s = 1/A - Π
-#     return L_d,L_s
-# end
-
 function LMC(P::Params,R::Results) ##Labor market clearing
-    @unpack n_s,v_s,s_grid,A = P
-    @unpack N_d,mu_0,p_star,M = R
+    @unpack n_s,v_s_entrant,s_grid,A = P
+    @unpack N_d,mu_0,p_star,M,pf_prof = R
     L_d::Float64 = 0.0
     Π::Float64=0.0
     for is =  1:n_s
         n_opt = N_d[is]
-        L_d+=n_opt*mu[is] + M*n_opt*v_s[is]
-        Π = profit(P,R,s_grid[is])*mu[is] #+ M*prof(P,R)*v_s[is]
+        L_d+=n_opt*mu_0[is] + M*n_opt*v_s_entrant[is]
+        Π += pf_prof[is]*mu_0[is] #+ M*prof(P,R)*v_s[is]
     end
     L_s = 1/A - Π
     return L_d,L_s
@@ -218,7 +214,7 @@ function dist_iterate(prim::Params, res::Results, tol::Float64 = 1e-3)
     while error>tol
         n+=1
         mu_next = VFI_Star(prim,res)
-        error = maximum(abs.(mu_next-res.mu))#I assume this is the maximum of the array
+        error = maximum(abs.(mu_next-res.mu)) #I assume this is the maximum of the array
         res.mu = mu_next
         println("Iteration number: ", n)
         println("Absolute difference: ", error)
@@ -237,7 +233,6 @@ function solve_firm_prob(R::Results,P::Params,α,tol = 1e-3)
     pf_prof = zeros(n_s)
     for is = 1:n_s
         # print(profit(P, R, s_grid[is]))
-        N_d[is] = profit(P, R, s_grid[is])
         N_d[is] = n_star(s_grid[is],P.θ,R.p_star)
         pf_prof[is] = profit(P, R, s_grid[is])
     end
@@ -259,82 +254,78 @@ function solve_firm_prob(R::Results,P::Params,α,tol = 1e-3)
         R.pf_entry_x = pf_entry_x
         R.val_func = val_func_next
         n += 1
-
         end
 end
 
-function stationary_price(P::Params, R::Results, α::Float64)
-    @unpack val_func = R
-    @unpack cf, ce,lambda,p_star = P
 
-    p0 = p_star
-    converge = 0
-    while converge == 0
-        R.val_func,pf_entry_x = VFI(P,R)
-        W = Entval(R,P)
-        if abs(W - p0*ce) > tol
-            if W > p0*ce
-                p1 = p0 + ((1-p0)/2)
-            else
-                p1 = p0 - ((1-p0)/2)
-            end
-        else
-            converge = 1
+function stationary_price(P::Params,R::Results,α::Float64,tol=1e-3)
+    @unpack v_s_entrant, ce,n_s = P
+    @unpack val_func, p_star = R
+    n  = 1
+    converge=0
+    while converge==0
+        solve_firm_prob(R,P, α,tol)
+        EC = 0.0
+        for is in 1:n_s
+            EC+= R.val_func[is] *v_s_entrant[is]
         end
+        EC= EC/R.p_star - ce
+        if abs(EC)<tol 
+            break
+        end 
+        if EC>=0 
+            R.p_star=R.p_star* (1-1e-4)
+        else
+            R.p_star=R.p_star* (1+1e-4)
+        end
+        if n%200==0
+            println("p is ",R.p_star,"    -    n is ",n)
+            println("tol is ",tol,"     -    EC is ",EC)
+        end
+        if n==100000 
+            printl("Kill Switch")    ##Kill switch @ 17k
+            converge=1
+            break
+        end
+        n+=1
     end
-    m0 = m_init
+end
+
+
+function stationary_M(P::Params,R::Results,tol=1e-3)
+    @unpack val_func,mu_0 = R
+    @unpack cf, ce, lambda, p_star = P
     convergence_mass = 0
+    n=0
+    # M_next=0.0
     while convergence_mass == 0
-        mu = StatDist(R,P)
-        Ld,Ls = LMC(mu,m,p1)
+        StatDist(R,P)
+        Ld,Ls = LMC(P,R)
         if abs(Ld-Ls)>tol
             if Ld>Ls
-                m0-=m_step
+                R.M-=R.M*1e-4
             else
-                m0+=m_step
+                R.M+=R.M*1e-4
             end
         else
             convergence_mass=1
+            println("Convergence Achieved")
+            break
         end
+        if n % 200 == 0
+            println("************************************")
+            println("Absolute value ", float(abs(Ld-Ls)))
+            println("=> M is update ", float(R.M))
+        end
+        if n == 50000 
+            println("Reached 1000")
+            break
+        end
+        n+=1
     end
+    return R ## Add return
 end
-##
-function solve_HR(P::Params,R::Results,tol=1e-3)
-    @unpack val_func = R
-    @unpack cf, ce,lambda,p_star = P
 
-    p0 = p_star
-    convergence = 0
-    while converge == 0
-        R.val_func,pf_entry_x = VFI(P,R)
-        W = Entval(R,P)
-        if abs(W - p0*ce) > tol
-            if W > p0*ce
-                p1 = p0 + ((1-p0)/2)
-            else
-                p1 = p0 - ((1-p0)/2)
-            end
-        else
-            convergence = 1
-        end
-    end
-    m0 = m_init
-    convergence_mass = 0
-    while convergence_mass == 0
-        mu = StatDist(R,P)
-        Ld,Ls = LMC(mu,m,p1)
-        if abs(Ld-Ls)>tol
-            if Ld>Ls
-                m0-=m_step
-            else
-                m0+=m_step
-            end
-        else
-            convergence_mass=1
-        end
-    end
-    return p1,mu,m0 ## Add return
-end
 
 function solve_HR2(P::Params,R::Results,tol=1e-3)
     @unpack val_func = R
@@ -356,7 +347,7 @@ function solve_HR2(P::Params,R::Results,tol=1e-3)
         end
     end
     R.m = 1
-    Ld,Ls = LMC(mu,m,p1)
+    Ld,Ls = LMC(P,R)
         if abs(Ld-Ls)>tol
             if Ld>Ls
                 m0-=m_step
@@ -378,3 +369,5 @@ function EVS()
     end
     U_1[i] = (gamma_e/alpha_1) +(1/alpha_1)*log((e^(alpha_1*val_func_in[i])+e^(alpha_1*val_func_out[i])))
 end
+
+
