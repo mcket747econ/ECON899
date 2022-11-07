@@ -29,10 +29,7 @@ using Optim, Plots, Parameters, Distributions, Random, DataFrames
     sigma_epsilon::Float64=sqrt((1-rho)*((sigma_logz)^2));
     a::Float64=0.078;
     gamma_e::Float64=0.5772156649
-     #Distribution of Entrants
-
 end
-
 
 mutable struct Results
     val_func::Array{Float64,1}
@@ -60,6 +57,7 @@ function Initialize()
     return P, R
 end
 P,R = Initialize()
+
 function n_star(s,θ,p_star)
     n = (θ*p_star*s)^(1/(1-θ))
     if n < 0
@@ -67,6 +65,7 @@ function n_star(s,θ,p_star)
     end
     return n
 end
+
 function profit(P::Params,R::Results,s)
     @unpack p_star = R
     @unpack cf, θ = P
@@ -103,21 +102,20 @@ function VFI(P::Params,R::Results)
         end
     end
     return val_func_next, pf_entry_x_out
-        #Then we want to solve the static labor problem
 end
 
 function VFI_shocks(P::Params,R::Results,α)
     @unpack n_s, F_transition, β= P
-    @unpack pf_prof,val_func = R
-    pf_entry_tmp = zeros(n_s)
+    @unpack pf_prof, pf_entry_x,val_func = R
+    # pf_entry_tmp = zeros(n_s)
     val_func_1 = zeros(n_s)
     val_func_0 = zeros(n_s)
     for i = 1:n_s
         val_func_0[i] =pf_prof[i] + β*sum(val_func[:].*F_transition[i,:])
         val_func_1[i] = pf_prof[i]
-        val_func[i],pf_entry_tmp[i] = Utility(P,R,val_func_0[i],val_func_1[i],α) 
+        val_func[i],pf_entry_x[i] = Utility(P,R,val_func_0[i],val_func_1[i],α) 
     end
-    return val_func, pf_entry_tmp
+    return val_func, pf_entry_x
         #Then we want to solve the static labor problem
 end
 
@@ -148,8 +146,9 @@ function Entval(R::Results,P::Params)
 end
 
 function StatDist(R::Results,P::Params,tol=1e-3)
+    @unpack n_s = P
     n=0
-    # mu_p =0.0
+    mu_p =zeros(n_s)
     while true
         # mu_p = sum((1-pf_entry_x(s))*F_transition[s,s']*mu(s;m))+ m*sum((1-pf_entry_x(s))*F_transition[s,sp]*v_s_entrant)
         mu_p= VFI_Star(P,R)
@@ -159,22 +158,8 @@ function StatDist(R::Results,P::Params,tol=1e-3)
         end 
         R.mu_0 = mu_p
         n+=1
-        # println(diff)
-        if n==500
-            println("mu_p is",mu_p,"; mu is",mu_0)
-            break
-        end
-        if n%40==0
-            println("mu_p is",mu_p,"    -   mu is",mu_0)
-            println("n is",n,"    -    mu is",mu_0)
-            break
-        end
-        # if n==2000
-        #     return mu_p
-        #     break
-        # end
     end
-    mu_p
+    return mu_p
 end
 
 
@@ -192,36 +177,6 @@ function LMC(P::Params,R::Results) ##Labor market clearing
     return L_d,L_s
 end
 
-
-function distr(P::Params, R::Results, tol::Float64 =-1e3)
-    @unpack n_s = P
-    @unpack pf_entry_x,M = R
-    mu = ones(n_s)/n_s
-    mu_next = ones(n_s)/n_s
-    Wint = 0
-    for sp_index=1:n_s
-        for s_index = 1:n_s
-            Wint+= (1-pf_entry_x[s_index])*F[s_index,sp_index]*mu(s_index)
-        end
-    end
-    mu_next
-end
-
-
-function dist_iterate(prim::Params, res::Results, tol::Float64 = 1e-3)
-    error = 100
-    n = 0
-    while error>tol
-        n+=1
-        mu_next = VFI_Star(prim,res)
-        error = maximum(abs.(mu_next-res.mu)) #I assume this is the maximum of the array
-        res.mu = mu_next
-        println("Iteration number: ", n)
-        println("Absolute difference: ", error)
-    end
-    print("Mu Distribution Converged in ", n, " Iterations.")
-
-end
 
 function solve_firm_prob(R::Results,P::Params,α,tol = 1e-3)
     @unpack n_s, s_grid = P
@@ -249,6 +204,7 @@ function solve_firm_prob(R::Results,P::Params,α,tol = 1e-3)
         # @printf("Absolute difference: %0.4f.\n", float(err))
         # println("***************************")
         if err < tol
+            R.val_func = val_func_next
             break
         end
         R.pf_entry_x = pf_entry_x
@@ -327,14 +283,31 @@ function stationary_M(P::Params,R::Results,tol=1e-3)
 end
 
 
-function solve_HR2(P::Params,R::Results,tol=1e-3)
+## Table to export 
+table= function(P::Params,R::Results)
+    @unpack n_s,v_s_entrant = P
+    mass_stay = sum(R.mu_0 .* (1 .- R.pf_entry_x))
+    mass_exit = sum(R.mu_0 .* R.pf_entry_x)
+    L_stay = sum(R.N_d .* R.mu_0)
+    L_enter = sum(R.N_d * R.M .* v_s_entrant)
+    agg_lab = sum(R.N_d .* R.mu_0  + R.N_d * R.M .* v_s_entrant)
+    [R.p_star, R.M, mass_stay,mass_exit, agg_lab, L_stay, L_enter, L_enter/agg_lab]
+end
+
+
+
+function solve_HR2(P::Params,R::Results,α,tol=1e-3)
     @unpack val_func = R
     @unpack cf, ce,lambda,p_star = P
 
     p0 = p_star
     convergence = 0
     while converge == 0
+        if α==0.0
         R.val_func,R.pf_entry_x = VFI(P,R)
+        else
+        R.val_func,R.pf_entry_x = VFI_shocks(P,R)
+        end
         W = Entval(R,P)
         if abs(W - p0*ce) > tol
             if W > p0*ce
@@ -359,15 +332,3 @@ function solve_HR2(P::Params,R::Results,tol=1e-3)
         end
     return p1,mu,m0 ## Add return
 end
-
-
-function EVS()
-    u_0 = zeros(n_s)
-    for i =1:n_s
-        val_func_in = profit(P,R,i) + β *sum(u_0[:].*F_transition[i,:])
-        val_funcOut = profit(P,R,i)
-    end
-    U_1[i] = (gamma_e/alpha_1) +(1/alpha_1)*log((e^(alpha_1*val_func_in[i])+e^(alpha_1*val_func_out[i])))
-end
-
-
