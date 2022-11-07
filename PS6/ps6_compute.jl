@@ -1,6 +1,6 @@
 using Parameters, Plots, Printf, DelimitedFiles, DataFrames, Setfield
 cd("C:/Users/Rafeh/Documents/GitHub/ECON899/PS6")
-include("ps6_model_rq.jl");
+include("ps6_model.jl");
 
 ## No Shocks
 P,R = Initialize()
