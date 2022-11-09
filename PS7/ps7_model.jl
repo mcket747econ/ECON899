@@ -90,20 +90,21 @@ function simulate_0(P,e)
 end
 
 ###Initial_simulation
-xy= simulate_0(P,R.e_0)
-R.x_t = xy[:,1]
-x_tm1 = R.x_t[t-1]
-x_tm1 = zeros(200)
-for t=1:P.T
-    if t > 1
-        x_tm1[t] = R.x_t[t-1]
-    else
-        x_tm1[t] = 0
-    end
-end
-R.M_t = [mean(R.x_t), sum(((R.x_t .- mean(R.x_t)).*((R.x_t .- mean(R.x_t)))))/(P.T*P.H_0), sum(((R.x_t .- mean(R.x_t)).*((x_tm1 .- mean(R.x_t)))))/(P.T*P.H_0)]
+function testing()
+    xy= simulate_0(P,R.e_0)
+    R.x_t = xy[:,1]
 
-Getmoments(P,P.sigma_0,P.rho_0,R,P.T,1)
+    x_tm1 = zeros(200)
+    for t=1:P.T
+        if t > 1
+            x_tm1[t] = R.x_t[t-1]
+        else
+            x_tm1[t] = 0
+        end
+    end
+    R.M_t = [mean(R.x_t), sum(((R.x_t .- mean(R.x_t)).*((R.x_t .- mean(R.x_t)))))/(P.T*P.H_0), sum(((R.x_t .- mean(R.x_t)).*((x_tm1 .- mean(R.x_t)))))/(P.T*P.H_0)]
+end
+
 
 # function Getmoments(P,f_sig,f_rho,R,T,H)
 #     #@unpack y_t = R
@@ -130,6 +131,7 @@ Getmoments(P,P.sigma_0,P.rho_0,R,P.T,1)
 #     return M_th
 # end
 
+###GetMoments for 3 moment case
 function Getmoments(P,f_sig,f_rho,R,T,H)
     #@unpack y_t = R
     y_t = zeros(T,H)
@@ -158,8 +160,8 @@ end
 
 
 
-simulate_0(P,R.e_0)
 
+### Get Moments for 2 moment case, mean and variance
 # function Getmoments(P,f_sig,f_rho,R,T,H)
 #     #@unpack y_t = R
 #     y_t = zeros(T,H)
@@ -169,6 +171,13 @@ simulate_0(P,R.e_0)
 #         y_t = simulate(P,R.e,f_sig,f_rho)
 #     end
 #     m_2 = zeros(2,H)
+    # for t=1:T
+    #     if t > 1
+    #         y_tm1[t] = y_t[t-1]
+    #     else
+    #         y_tm1[t] = 0
+    #     end
+    # end
 #     for i = 1:H
 #         m_2[:,i] = [mean(y_t), sum(((y_t .- mean(y_t)).*((y_t .- mean(y_t)))))/(P.T*H)]
 #     end
@@ -177,18 +186,7 @@ simulate_0(P,R.e_0)
 # end
 
 
-function SMM(M_t,W,e,P,f_sig,f_rho)
-    y_t = zeros(P.T,P.H)
-    y_t = simulate(P,e,f_sig,f_rho)
-    m_2 = zeros(3,P.H)
-    for i = 1:P.H
-        m_2[:,i] = [mean(y_t), sum(((y_t .- mean(y_t)).*((y_t .- mean(y_t)))))/(P.T*P.H)]
-    end
-    M_th = mean(m_2,dims=2)
-    fin = sum((M_t .- M_th).*W.*(M_t.-M_th))
-    return fin,M_th
-end
-
+####Getmoments for two moment case, variance autocovariance
 
 # function Getmoments(P,f_sig,f_rho,R,T,H)
 #     #@unpack y_t = R
@@ -199,9 +197,17 @@ end
 #         y_t = simulate(P,R.e,f_sig,f_rho)
 #     end
 #     R.y_t = simulate(P,R.e,f_sig,f_rho)
+
+    # for t=1:T
+    #     if t > 1
+    #         y_tm1[t] = y_t[t-1]
+    #     else
+    #         y_tm1[t] = 0
+    #     end
+    # end
 #     m_2 = zeros(2,H)
 #     for i = 1:H
-#         m_2[:,i] = [mean(y_t), sum(((y_t .- mean(y_t)).*((y_t .- mean(y_t)))))/(P.T*P.H)]
+#         m_2[:,i] = [sum(((y_t .- mean(y_t)).*((y_t .- mean(y_t)))))/(P.T*P.H),sum(((y_t .- mean(y_t)).*((y_tm1 .- mean(y_t)))))/(P.T*H)]
 #     end
 #     M_th = mean(m_2,dims=2)
 #     return M_th
@@ -274,7 +280,6 @@ end
 Getmoments(P,P.f_sig[50],P.f_rho[1],R,P.T,10)
 R.M_t
     #M_th = zeros(P.grid_l,P.grid_l)
-length(R.M_t)
 R.j_func = objective(P,R.M_t,P.W,R.e,R)
 function min_obj(j_func)
     sig_hat_index = argmin(j_func)[1]
@@ -286,11 +291,9 @@ function min_obj(j_func)
 
     return sig_hat,rho_hat
 end
-argmin(R.j_func)
 
-P.f_sig[28]
-minimum(R.j_func)
-R.j_func[28,1]
+
+
 plot(P.f_rho,P.f_sig,R.j_func,st=:surface,xlabel ="Rho",ylabel="Sigma",zlabel="J Function",camera=(40,2))
 savefig("C:/Users/mcket/OneDrive/Documents/Fall 2022/ECON899-Computational/899Code/PS7/j_func5.png")
 sig_hat,rho_hat = min_obj(R.j_func)
@@ -308,7 +311,7 @@ function ComputeSE(e,rho_hat,sigma_hat,P,R,H,W)
     delta_rho1 = delta_rho[[1,2,3]]
     # println("delta_rho1",delta_rho1)
     delta_b = [delta_rho,delta_sig]
-    # println("deltab ",delta_b)
+    println("deltab ",delta_b)
     delta_b = [delta_b[1],delta_b[2]]
     # println("deltab ",delta_b)
 
@@ -349,7 +352,7 @@ function procedure_smm(P,R,lag)
 #    println(rho_hat_2)
 #    println("sigma is",sigma_hat_2)
     diag_vcov_2 = ComputeSE(R.e,rho_hat_2,sigma_hat_2,P,R,P.H,W_star)
-    return rho_hat_2,sigma_hat_2
+    return rho_hat_2,sigma_hat_2,diag_vcov_2,diag_vcov
 
 end
 argmin(R.j_func)
@@ -401,7 +404,7 @@ R.j_func
 Getmoments(R.e,P,.8,.8,R,P.T,P.H)
 
 
-
+###GammaFunc for overidentified case
 function GammaFunc(prim::parameters, m_0,y_t, lag::Int64)
     @unpack H, T = prim
 
@@ -454,7 +457,111 @@ function GammaFunc(prim::parameters, m_0,y_t, lag::Int64)
     return gamma
 end
 
-b_1 = optimize(R.j_func, [0.5, 1.0]).minimizer
+####GammaFunc for just identified mean and variance case
+function GammaFunc1(prim::parameters, m_0,y_t, lag::Int64)
+    @unpack H, T = prim
+
+    mom_sim = [m_0[1], m_0[2]]
+    data_sim = y_t
+
+    # gamma_tot = zeros(length(prim.grid_l),length(prim.grid_l))
+    gamma_tot = zeros(2,2)
+
+    for t = (1+lag):T
+        for h = 1:H
+            # No Lagged
+            avg_obs = data_sim[t,h]
+            if t > 1
+                avg_obs_tm1 = data_sim[t-1,h]
+            else
+                avg_obs_tm1 = 0
+            end
+            avg_h = mean(data_sim[:,h])
+            var_obs = (avg_obs - avg_h)^2
+            auto_cov_obs = (avg_obs - avg_h)*(avg_obs_tm1 - avg_h)
+
+            mom_obs_diff = [avg_obs, var_obs] - mom_sim
+            # mom_obs_diff = [avg_obs, var_obs, auto_cov_obs] - mom_sim
+            mom_obs_diff = mom_obs_diff
+
+            # Lagged
+            avg_lag = data_sim[t-lag,h]
+            if t - lag > 1
+                avg_lag_tm1 = data_sim[t-lag-1,h]
+            else
+                avg_lag_tm1 = 0
+            end
+            avg_h = mean(data_sim[:,h])
+            var_lag = (avg_lag - avg_h)^2
+            auto_cov_lag = (avg_lag - avg_h)*(avg_lag_tm1 - avg_h)
+
+            mom_lag_diff = [avg_lag, var_lag] - mom_sim
+            # mom_lag_diff = [avg_lag, var_lag, auto_cov_lag] - mom_sim
+            mom_lag_diff = mom_lag_diff
+            #print(mom_lag_diff)
+            #print(mom_obs_diff)
+
+            gamma_tot = gamma_tot .+ mom_obs_diff*mom_lag_diff'
+        end
+    end
+
+    gamma = (1/(T*H)).*gamma_tot
+
+    return gamma
+end
+##gamma func for just idenftied variance autocovariance case
+function GammaFunc2(prim::parameters, m_0,y_t, lag::Int64)
+    @unpack H, T = prim
+
+    mom_sim = [m_0[2],m_0[3]]
+    data_sim = y_t
+
+    # gamma_tot = zeros(length(prim.grid_l),length(prim.grid_l))
+    gamma_tot = zeros(3,3)
+
+    for t = (1+lag):T
+        for h = 1:H
+            # No Lagged
+            avg_obs = data_sim[t,h]
+            if t > 1
+                avg_obs_tm1 = data_sim[t-1,h]
+            else
+                avg_obs_tm1 = 0
+            end
+            avg_h = mean(data_sim[:,h])
+            var_obs = (avg_obs - avg_h)^2
+            auto_cov_obs = (avg_obs - avg_h)*(avg_obs_tm1 - avg_h)
+
+            mom_obs_diff = [ var_obs, auto_cov_obs] - mom_sim
+            # mom_obs_diff = [avg_obs, var_obs, auto_cov_obs] - mom_sim
+            mom_obs_diff = mom_obs_diff
+
+            # Lagged
+            avg_lag = data_sim[t-lag,h]
+            if t - lag > 1
+                avg_lag_tm1 = data_sim[t-lag-1,h]
+            else
+                avg_lag_tm1 = 0
+            end
+            avg_h = mean(data_sim[:,h])
+            var_lag = (avg_lag - avg_h)^2
+            auto_cov_lag = (avg_lag - avg_h)*(avg_lag_tm1 - avg_h)
+
+            mom_lag_diff = [var_lag,auto_cov_lag] - mom_sim
+            # mom_lag_diff = [avg_lag, var_lag, auto_cov_lag] - mom_sim
+            mom_lag_diff = mom_lag_diff
+            #print(mom_lag_diff)
+            #print(mom_obs_diff)
+
+            gamma_tot = gamma_tot .+ mom_obs_diff*mom_lag_diff'
+        end
+    end
+
+    gamma = (1/(T*H)).*gamma_tot
+
+    return gamma
+end
+
 
 function Bootstrap()
     rho_hat = zeros(100)
@@ -474,8 +581,8 @@ function Bootstrap()
             end
             R.M_t = [mean(R.x_t), sum(((R.x_t .- mean(R.x_t)).*((R.x_t .- mean(R.x_t)))))/(P.T*P.H_0), sum(((R.x_t .- mean(R.x_t)).*((x_tm1 .- mean(R.x_t)))))/(P.T*P.H_0)]
             sigma_hat[i],rho_hat[i]  = procedure_smm(P,R,4)
-            println(rho_hat[i])
+            #println(rho_hat[i])
         end
         return rho_hat, sigma_hat
 end
-Bootstrap()
+rho_hat,sigma_hat = Bootstrap()
