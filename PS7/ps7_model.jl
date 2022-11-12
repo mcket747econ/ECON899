@@ -233,106 +233,6 @@ end
 
 
 
-Getmoments(P,P.sigma_0,P.rho_0,R,P.T,1)
-
-### Get Moments for 2 moment case, mean and variance
-# function Getmoments(P,f_sig,f_rho,R,T,H)
-#     #@unpack y_t = R
-#     y_t = zeros(T,H)
-#     if H ==1
-#         y_t = simulate_0(P,R.e_0)
-#     else
-#         y_t = simulate(P,R.e,f_sig,f_rho)
-#     end
-#     m_2 = zeros(2,H)
-    # for t=1:T
-    #     if t > 1
-    #         y_tm1[t] = y_t[t-1]
-    #     else
-    #         y_tm1[t] = 0
-    #     end
-    # end
-#     for i = 1:H
-#         m_2[:,i] = [mean(y_t), sum(((y_t .- mean(y_t)).*((y_t .- mean(y_t)))))/(P.T*H)]
-#     end
-#     M_th = mean(m_2,dims=2)
-#     return M_th
-# end
-
-
-####Getmoments for two moment case, variance autocovariance
-
-# function Getmoments(P,f_sig,f_rho,R,T,H)
-#     #@unpack y_t = R
-#     y_t = zeros(T,H)
-#     if H ==1
-#         y_t = simulate_0(P,R.e_0)
-#     else
-#         y_t = simulate(P,R.e,f_sig,f_rho)
-#     end
-#     R.y_t = simulate(P,R.e,f_sig,f_rho)
-
-    # for t=1:T
-    #     if t > 1
-    #         y_tm1[t] = y_t[t-1]
-    #     else
-    #         y_tm1[t] = 0
-    #     end
-    # end
-#     m_2 = zeros(2,H)
-#     for i = 1:H
-#         m_2[:,i] = [sum(((y_t .- mean(y_t)).*((y_t .- mean(y_t)))))/(P.T*P.H),sum(((y_t .- mean(y_t)).*((y_tm1 .- mean(y_t)))))/(P.T*H)]
-#     end
-#     M_th = mean(m_2,dims=2)
-#     return M_th
-# end
-
-# function objective
-#     M_th = Getmoments()
-#     j_func = sum((M_t .- M_th).*W.*(M_t.-M_th))
-#
-#
-#
-# end
-
-
-# function SMM_fm(x,M_t,W,e,P)
-#     P.f_rho = x(1)
-#     P.f_sigma = x(2)
-#     obj = SMM(M_t,W,e,P)
-# end
-#
-# function minobjfunc(W,k)
-#
-#
-#
-# end
-
-# function gamma(P,R,j)
-#     #@unpack y_t = R
-#     y_t = R.y_t
-#     M_th = zeros(2,P.H)
-#     m_2 = zeros(2,P.H)
-#     #y_t = zeros(P.T,P.H)
-#     gamm = zeros(2)
-#     for i = 1:P.H
-#         m_x  = mean(y_t[:,i])
-#         m_2[:,i] = [mean(y_t), sum((y_t .- mean(y_t)).*((y_t .- mean(y_t))/P.T))]
-#     end
-#     M_th = mean(m_2,dims=2)
-#     for h = 1:P.H
-#         xbar = mean(y_t[:,h])
-#         for t = j+1:P.T
-#             gamm = gamm + (1/((P.T)*P.H)).*(([y_t[t,h], (y_t[t,h].-xbar)^2] .- M_th).*([y_t[t-j,h],(y_t[t-j,h].-xbar)^2  ] .- M_th))
-#         end
-#     end
-#     return gamm
-#
-# end
-
-
-
-#R.e_0[1][0:5,1]
 
 ###underidentified Case
 function objective(P,M_t,W,e,R)
@@ -346,7 +246,7 @@ function objective(P,M_t,W,e,R)
             M_th = Getmoments(P,P.f_sig[j],P.f_rho[i],R,P.T,P.H)
             # print(M_th)
             # print(M_th)
-            j_func[i,j] = objective_1(P.f_rho[i],,prim,T,M_t,R,i,j,W,H)
+            j_func[i,j] = objective_1(P.f_rho[i],P.f_sig[j],prim,T,M_t,R,i,j,W,H)
         end
     end
     return j_func
@@ -360,13 +260,18 @@ for i = 1:P.grid_l
         M_th = Getmoments(P,P.f_sig[i],P.f_rho[j],R,P.T,P.H)
         # print(M_th)
         # print(M_th)
-        R.j_func[i,j] =  objective_1(P.f_rho[i],P.f_sig[j],P,P.T,M_th,R,1,3,P.W,P.H_0)
+        R.j_func[i,j] =  objective_1(P.f_rho[i],P.f_sig[j],P,P.T,M_th,R,2,3,I,P.H_0)
 
     end
 end
 
+plot(P.f_rho,P.f_sig,R.j_func,st=:surface,xlabel ="Rho",ylabel="Sigma",zlabel="J Function",camera=(40,2))
+minimum(R.j_func)
+minimum(R.j_func)
+minimum(R.j_func)
 
 
+R.j_func
     #M_th = zeros(P.grid_l,P.grid_l)
 function min_obj(j_func)
     sig_hat_index = argmin(j_func)[1]
@@ -387,32 +292,60 @@ savefig("C:/Users/mcket/OneDrive/Documents/Fall 2022/ECON899-Computational/899Co
 sig_hat,rho_hat = min_obj(R.j_func)
 argmin(R.j_func)
 minimum(R.j_func)
-function ComputeSE(rho_hat,sigma_hat,P,R,H,W)
-    eps = 1e-12
-    m_2 = Getmoments(P,sigma_hat,rho_hat,R,P.T,H)
-    m_rhop = Getmoments(P,sigma_hat,rho_hat .- eps,R,P.T,H)
-    # print(m_rhop)
-    #println(m_rhop)
-    m_sigp = Getmoments(P,sigma_hat.-eps,rho_hat,R,P.T,H)
+function ComputeSE(rho_hat,sigma_hat,P,R,H,W,i,j)
+    eps = 1e-10
+    if i == 1 && j ==3
+        m_2 = Getmoments(P,sigma_hat,rho_hat,R,P.T,H)
+        #println("m_2",m_2)
+        m_rhop = Getmoments(P,sigma_hat,rho_hat - eps,R,P.T,H)
+        m_sigp = Getmoments(P,sigma_hat-eps,rho_hat,R,P.T,H)
+    elseif i == 1 && j==2
+        m_2 = Getmoments(P,sigma_hat,rho_hat,R,P.T,H)[1:2]
+        #println("m_2",m_2)
+        m_rhop = Getmoments(P,sigma_hat,rho_hat - eps,R,P.T,H)[1:2]
+        #println("mrho", m_rhop)
+        # print(m_rhop)
+        #println(m_rhop)
+        m_sigp = Getmoments(P,sigma_hat-eps,rho_hat,R,P.T,H)[1:2]
+    else
+        m_2 = Getmoments(P,sigma_hat,rho_hat,R,P.T,H)[2:3]
+        print("m2",m_2)
+        #println("m_2",m_2)
+        m_rhop = Getmoments(P,sigma_hat,rho_hat - eps,R,P.T,H)[2:3]
+        #println("mrho", m_rhop)
+        # print(m_rhop)
+        #println(m_rhop)
+        m_sigp = Getmoments(P,sigma_hat-eps,rho_hat,R,P.T,H)[2:3]
+    end
+
+
     delta_rho = (m_rhop .- m_2)./eps
+    #println(delta_rho)
     delta_sig = (m_sigp .- m_2)./eps
-    delta_rho1 = delta_rho[[1,2,3]]
+    # delta_rho1 = delta_rho[[1,2,3]]
     # println("delta_rho1",delta_rho1)
     delta_b = [delta_rho,delta_sig]
-    println("deltab ",delta_b)
-    delta_b = [delta_b[1],delta_b[2]]
-    # println("deltab ",delta_b)
+    #println("deltab ",delta_b)
+    delta_b = [delta_b[1] delta_b[2]]
+    #println("W",W)
+    #println(delta_b)
+    #$println("deltab ",delta_b)
 
-    x = delta_b'*I
-    y = x.*delta_b
+    # x = delta_b'*W
+    # y = x.*delta_b
     # println("y",y)
-    y2 = y[[1,2,3]]
-
-    vcov =  inv.(y)
+    # y2 = y[[1,2,3]]
+    #println("delta_b",delta_b)
+    y = delta_b'*W*delta_b
+    #println("y",y)
+    #println("delta_b",delta_b)
+    vcov =  inv(y)
     # print("vcov",vcov)
     #println(vcov)
     return (diag(vcov)).^(0.5)
 end
+
+ComputeSE(P.rho_0,P.sigma_0,P,R,P.H,I,2,3)
 
 function min_obj1(i,j,P,T,M_T,R,W,H)
     b = optimize( b -> objective_1(b[1],b[2],P,T,M_T,R,i,j,W,H), [0.5,1.0]).minimizer
@@ -432,13 +365,13 @@ function procedure_smm(P,R,lag,i,j)
     m_0 = Getmoments(P,P.sigma_0,P.rho_0,R,P.T,1)
     #println("mo is",m_0)
     b1 = min_obj1(i,j,P,P.T,m_0,R,I,P.H_0)
-    println(b1)
+    #println(b1)
     # R.y_t = simulate(P,R.e,sigma_hat,rho_hat)
     # R.j_func = objective(P,m_0,P.W,R.e,R)
     # rho_hat, sigma_hat = min_obj1(R.j_func)
 #    println("first rho is ",rho_hat)
 #    println("first sigma is ",sigma_hat)
-    diag_vcov = ComputeSE(b1[1],b1[2],P,R,P.H,I)
+    diag_vcov = ComputeSE(b1[1],b1[2],P,R,P.H,I,i,j)
     m_1 = Getmoments(P,b1[2],b1[1],R,P.T,P.H)
     #println(m_1)
     y_t = simulate(P,R.e,b1[2],b1[1])
@@ -449,12 +382,12 @@ function procedure_smm(P,R,lag,i,j)
     b2 = min_obj1(i,j,P,P.T,m_0,R,W_star,P.H)
 #    println(rho_hat_2)
 #    println("sigma is",sigma_hat_2)
-    diag_vcov_2 = ComputeSE(b2[1],b2[2],P,R,P.H,W_star)
+    diag_vcov_2 = ComputeSE(b2[1],b2[2],P,R,P.H,W_star,i,j)
     return b2, diag_vcov_2, b1, diag_vcov
 
 end
 
-procedure_smm(P,R,2,2,3)
+procedure_smm(P,R,2,1,2)
 argmin(R.j_func)
 minimum(R.j_func)*200*(10/11)
 procedure_smm(P,R,2)
@@ -779,4 +712,33 @@ function Bootstrap()
         end
         return rho_hat, sigma_hat
 end
-rho_hat,sigma_hat = Bootstrap()
+# rho_hat,sigma_hat = Bootstrap()
+
+ function Solve_model1(P,R,k,l,lag,boot::Int64=0)
+     boot_sims = 1000
+     rho_1_vals = zeros(boot_sims)
+     rho_2_vals = zeros(boot_sims)
+     sig_1_vals = zeros(boot_sims)
+     sig_2_vals = zeros(boot_sims)
+     vcov_1_vals = [Vector{Float64}(undef,2) for i in 1:1000]
+     vcov_2_vals = [Vector{Float64}(undef,2) for i in 1:1000]
+     if boot == 1
+         for i = 1:boot_sims
+             Random.seed!(i)
+             P,R = initialize()
+             b2,vcov2,b1,vcov1 = procedure_smm(P,R,lag,k,l)
+             rho_1_vals[i] = b1[1]
+             rho_2_vals[i] = b2[1]
+             sig_1_vals[i] = b1[2]
+             sig_2_vals[i] = b2[2]
+             vcov_1_vals[i] = vcov1
+             vcov_2_vals[i] = vcov2
+             println("bootstrap ",i )
+        end
+
+    end
+    return [rho_1_vals,rho_2_vals,sig_1_vals,sig_2_vals,vcov_1_vals,vcov_2_vals]
+
+end
+
+Solve_model1(P,R,1,3,2,1)
