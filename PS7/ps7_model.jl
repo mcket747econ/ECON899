@@ -77,6 +77,51 @@ function simulate(P,e,f_sig,f_rho)
 
 end
 
+function Estimation_prep(prim::Primitives)
+    @unpack rho_0, sigma_0, T, H = prim # true rho, true sigma
+    dist = Normal(0,sigma_0)  #distribution shocks are drawn from for true data
+    data_true = zeros(T)
+    data_lag = zeros(T)
+
+    data_true[1] = rand(dist) # first value is random draw from distribution because x_0 = 0
+
+    for i = 2:T  #fill in rest of true data
+        data_true[i] = rho_0*data_true[i - 1] + rand(dist)
+    end
+    for i = 1:T
+        if i > 1
+            data_lag[i] = data_true[i-1]
+        else
+            data_lag[i] = 0
+        end
+    end
+
+    #compute true data moments
+    avg = mean(data_true)
+    variance = var(data_true)
+    auto_cov = (data_true .- avg).*(data_lag .- avg)
+
+    #distribution to draw shocks from for simulated data
+    dist2 = Normal(0,1)
+    #how we generate the sequence of shocks
+    shocks = zeros(T,H) # need a shock for every simulation round (H) and each simulation(2000)
+    for t=1:T, h = 1:H
+        shocks[t,h] = rand(dist2)  #fill in array of shocks
+    end
+
+    #initialize target struct
+    targ = Targets(data_true,avg,variance, auto_corr, shocks)
+    M_t = [avg, variance, auto_cov]
+    return targ, M_t #return deliverable
+end
+
+
+
+
+
+
+
+
 function simulate_0(P,e)
     #set.seed(123)
     x_t = zeros(P.T,P.H_0)
@@ -88,22 +133,24 @@ function simulate_0(P,e)
     return x_t
 
 end
-
+# using Pkg;Pkg.add("StatsBase")
+# using StatsBase
 ###Initial_simulation
-function testing()
-    xy= simulate_0(P,R.e_0)
-    R.x_t = xy[:,1]
-
-    x_tm1 = zeros(200)
-    for t=1:P.T
-        if t > 1
-            x_tm1[t] = R.x_t[t-1]
-        else
-            x_tm1[t] = 0
-        end
+#function testing()
+xy= simulate_0(P,R.e_0)
+R.x_t = xy[:,1]
+l = ones(200)
+x_tm1 = zeros(200)
+for t=1:P.T
+    if t > 1
+        x_tm1[t] = R.x_t[t-1]
+    else
+        x_tm1[t] = 0
     end
-    R.M_t = [mean(R.x_t), sum(((R.x_t .- mean(R.x_t)).*((R.x_t .- mean(R.x_t)))))/(P.T*P.H_0), sum(((R.x_t .- mean(R.x_t)).*((x_tm1 .- mean(R.x_t)))))/(P.T*P.H_0)]
 end
+R.M_t = [mean(R.x_t), sum(((R.x_t .- mean(R.x_t)).*((R.x_t .- mean(R.x_t)))))/(P.T*P.H_0), sum(((R.x_t .- mean(R.x_t)).*((x_tm1 .- mean(R.x_t)))))/(P.T*P.H_0)]
+#end
+R.j_func = objective(P,R.M_t,P.W,R.e,R)
 
 
 # function Getmoments(P,f_sig,f_rho,R,T,H)
@@ -130,7 +177,7 @@ end
 #     M_th = mean(m_2,dims=2)
 #     return M_th
 # end
-
+simulate_0(P,R.e_0)
 ###GetMoments for 3 moment case
 function Getmoments(P,f_sig,f_rho,R,T,H)
     #@unpack y_t = R
@@ -149,17 +196,44 @@ function Getmoments(P,f_sig,f_rho,R,T,H)
             y_tm1[t] = 0
         end
     end
-
-    for i = 1:H
-        m_2[:,i] = [mean(y_t),sum(((y_t .- mean(y_t)).*((y_t .- mean(y_t)))))/(P.T*H), sum(((y_t .- mean(y_t)).*((y_tm1 .- mean(y_t)))))/(P.T*H)]
+    avg_vec = zeros(H)
+    var_vec = zeros(H)
+    autocov_vec = zeros(H)
+    for h = 1:H
+         avg_vec[h] = mean(y_t[:,h])
+         var_vec[h] = var(y_t[:,h])
+        m_2[:,h] = [mean(y_t[:,h]),sum(((y_t[:,h] .- mean(y_t[:,h])).*((y_t[:,h] .- mean(y_t[:,h])))))/(P.T*H), sum(((y_t[:,h] .- mean(y_t[:,h])).*((y_tm1[:,h] .- mean(y_t[:,h])))))/(P.T*H)]
     end
-    M_th = mean(m_2,dims=2)
-    return M_th
+    avg_fin = mean(avg_vec)
+    var_fin = mean(var_vec)
+    auto_cov_fin = mean((y_t .- avg_fin)[2:T,:] .* (y_t .- avg_fin)[1:T-1,:])
+
+    M_th = (m_2,dims=2)
+    return  [avg_fin, var_fin, auto_cov_fin]
+end
+
+# R.j_func = objective(P,R.M_t,P.W,R.e,R)
+
+
+function objective_1(rho,sigma,prim,T,M_t,R,i,j,W,H)
+    m_sim = Getmoments(P,sigma,rho,R,T,H)
+    if i == 1 && j ==3
+        g_th = [M_t[1] - m_sim[1], M_t[2] - m_sim[2],M_t[3] - m_sim[3]] ## NEED TO UPDATE THIS to include auto correlation, difference between true mean and sample mean
+        J = g_th'*W*g_th
+    elseif i == 1 && j==2
+        g_th = [M_t[1] - m_sim[1], M_t[2] - m_sim[2]] ## NEED TO UPDATE THIS to include auto correlation, difference between true mean and sample mean
+        J = g_th'*W*g_th
+    else
+        g_th = [M_t[2] - m_sim[2],M_t[3] - m_sim[3]] ## NEED TO UPDATE THIS to include auto correlation, difference between true mean and sample mean
+        J = g_th'*W*g_th
+
+    end
+    return J
 end
 
 
 
-
+Getmoments(P,P.sigma_0,P.rho_0,R,P.T,1)
 
 ### Get Moments for 2 moment case, mean and variance
 # function Getmoments(P,f_sig,f_rho,R,T,H)
@@ -269,18 +343,31 @@ function objective(P,M_t,W,e,R)
         for j = 1:P.grid_l
             #f_rho = P.f_rho[j]
             #j_func[i,j],M_th[i,j] = SMM(M_t,W,e,P,P.f_sig[i],P.f_rho[j])
-            M_th = Getmoments(P,P.f_sig[i],P.f_rho[j],R,P.T,P.H)
+            M_th = Getmoments(P,P.f_sig[j],P.f_rho[i],R,P.T,P.H)
             # print(M_th)
             # print(M_th)
-            j_func[i,j] = sum((M_t .- M_th).*W.*(M_t .- M_th))
+            j_func[i,j] = objective_1(P.f_rho[i],,prim,T,M_t,R,i,j,W,H)
         end
     end
     return j_func
 end
-Getmoments(P,P.f_sig[50],P.f_rho[1],R,P.T,10)
-R.M_t
+j_func = zeros(P.grid_l,P.grid_l)
+for i = 1:P.grid_l
+    #P.f_sig = P.f_sig[i]
+    for j = 1:P.grid_l
+        #f_rho = P.f_rho[j]
+        #j_func[i,j],M_th[i,j] = SMM(M_t,W,e,P,P.f_sig[i],P.f_rho[j])
+        M_th = Getmoments(P,P.f_sig[i],P.f_rho[j],R,P.T,P.H)
+        # print(M_th)
+        # print(M_th)
+        R.j_func[i,j] =  objective_1(P.f_rho[i],P.f_sig[j],P,P.T,M_th,R,1,3,P.W,P.H_0)
+
+    end
+end
+
+
+
     #M_th = zeros(P.grid_l,P.grid_l)
-R.j_func = objective(P,R.M_t,P.W,R.e,R)
 function min_obj(j_func)
     sig_hat_index = argmin(j_func)[1]
     #println(sig_hat_index)
@@ -294,12 +381,13 @@ end
 
 
 
+
 plot(P.f_rho,P.f_sig,R.j_func,st=:surface,xlabel ="Rho",ylabel="Sigma",zlabel="J Function",camera=(40,2))
 savefig("C:/Users/mcket/OneDrive/Documents/Fall 2022/ECON899-Computational/899Code/PS7/j_func5.png")
 sig_hat,rho_hat = min_obj(R.j_func)
 argmin(R.j_func)
 minimum(R.j_func)
-function ComputeSE(e,rho_hat,sigma_hat,P,R,H,W)
+function ComputeSE(rho_hat,sigma_hat,P,R,H,W)
     eps = 1e-12
     m_2 = Getmoments(P,sigma_hat,rho_hat,R,P.T,H)
     m_rhop = Getmoments(P,sigma_hat,rho_hat .- eps,R,P.T,H)
@@ -319,42 +407,54 @@ function ComputeSE(e,rho_hat,sigma_hat,P,R,H,W)
     y = x.*delta_b
     # println("y",y)
     y2 = y[[1,2,3]]
-    # println(y)
-    # println("y2",y2)
-    # typeof(y)
+
     vcov =  inv.(y)
     # print("vcov",vcov)
     #println(vcov)
     return (diag(vcov)).^(0.5)
+end
 
+function min_obj1(i,j,P,T,M_T,R,W,H)
+    b = optimize( b -> objective_1(b[1],b[2],P,T,M_T,R,i,j,W,H), [0.5,1.0]).minimizer
+    return b
 
 end
 
+b = min_obj1(1,2,P,P.T,R.M_t,R,I,P.H_0)
+b[1]
 min_obj(R.j_func)
 delta_b = [[-0.9655887200921143; -30.63105324940807;;], [-0.13414269695033454; -8.033129716977783;;]]
 delta_b[2]
-function procedure_smm(P,R,lag)
+function procedure_smm(P,R,lag,i,j)
+    R.x_t = simulate_0(P,R.e_0)[:,1]
+    m_test = Getmoments(P,P.sigma_0,P.rho_0,R,P.T,1,)
+
     m_0 = Getmoments(P,P.sigma_0,P.rho_0,R,P.T,1)
     #println("mo is",m_0)
-    R.j_func = objective(P,m_0,P.W,R.e,R)
-    rho_hat, sigma_hat = min_obj(R.j_func)
+    b1 = min_obj1(i,j,P,P.T,m_0,R,I,P.H_0)
+    println(b1)
+    # R.y_t = simulate(P,R.e,sigma_hat,rho_hat)
+    # R.j_func = objective(P,m_0,P.W,R.e,R)
+    # rho_hat, sigma_hat = min_obj1(R.j_func)
 #    println("first rho is ",rho_hat)
 #    println("first sigma is ",sigma_hat)
-    diag_vcov = ComputeSE(R.e,rho_hat,sigma_hat,P,R,P.H,P.W)
-    m_1 = Getmoments(P,sigma_hat,rho_hat,R,P.T,P.H)
+    diag_vcov = ComputeSE(b1[1],b1[2],P,R,P.H,I)
+    m_1 = Getmoments(P,b1[2],b1[1],R,P.T,P.H)
     #println(m_1)
-    y_t = simulate(P,R.e,sigma_hat,rho_hat)
-    S_th = NeweyWest(P,m_1,y_t)
+    y_t = simulate(P,R.e,b1[2],b1[1])
+    S_th = NeweyWest(P,m_1,y_t,i,j)
     W_star = inv(S_th)
     #println('W', W_star)
-    R.j_func = objective(P,m_1,W_star,R.e,R)
-    rho_hat_2, sigma_hat_2 = min_obj(R.j_func)
+    #R.j_func = objective(P,m_1,W_star,R.e,R)
+    b2 = min_obj1(i,j,P,P.T,m_0,R,W_star,P.H)
 #    println(rho_hat_2)
 #    println("sigma is",sigma_hat_2)
-    diag_vcov_2 = ComputeSE(R.e,rho_hat_2,sigma_hat_2,P,R,P.H,W_star)
-    return rho_hat_2,sigma_hat_2,diag_vcov_2,diag_vcov
+    diag_vcov_2 = ComputeSE(b2[1],b2[2],P,R,P.H,W_star)
+    return b2, diag_vcov_2, b1, diag_vcov
 
 end
+
+procedure_smm(P,R,2,2,3)
 argmin(R.j_func)
 minimum(R.j_func)*200*(10/11)
 procedure_smm(P,R,2)
@@ -385,13 +485,13 @@ xyz = [[939.1937847444417;;] [246.1927507952068;;]; [246.1927507952068;;] [64.54
 [xyz[[1,2]]
 y= x.*w
 y*x
-function NeweyWest(prim::parameters, m_0,y_t)
+function NeweyWest(prim::parameters, m_0,y_t,k,l)
     lag_max = 4
-    Sy = GammaFunc(prim, m_0,y_t, 0)
+    Sy = GammaFunc(prim, m_0,y_t, 0,k,l)
 
     # loop over lags
     for i = 1:lag_max
-        gamma_i = GammaFunc(prim, m_0,y_t, i)
+        gamma_i = GammaFunc(prim, m_0,y_t, i,k,l)
         Sy += (gamma_i + gamma_i').*(1-(i/(lag_max + 1)))
     end
     S = (1 + 1/prim.H).*Sy
@@ -399,58 +499,152 @@ function NeweyWest(prim::parameters, m_0,y_t)
     return S
 end
 
-Getmoments(P,P.sigma_0,P.rho_0,R,P.T,1)
 R.j_func
 Getmoments(R.e,P,.8,.8,R,P.T,P.H)
 
 
 ###GammaFunc for overidentified case
-function GammaFunc(prim::parameters, m_0,y_t, lag::Int64)
+function GammaFunc(prim::parameters, m_0,y_t, lag::Int64,i,j)
     @unpack H, T = prim
 
-    mom_sim = [m_0[1], m_0[2],m_0[3]]
-    data_sim = y_t
+    if i ===1 && j == 3
+        mom_sim = [m_0[1], m_0[2],m_0[3]]
+        data_sim = y_t
 
-    # gamma_tot = zeros(length(prim.grid_l),length(prim.grid_l))
-    gamma_tot = zeros(3,3)
+        # gamma_tot = zeros(length(prim.grid_l),length(prim.grid_l))
+        gamma_tot = zeros(3,3)
 
-    for t = (1+lag):T
-        for h = 1:H
-            # No Lagged
-            avg_obs = data_sim[t,h]
-            if t > 1
-                avg_obs_tm1 = data_sim[t-1,h]
-            else
-                avg_obs_tm1 = 0
+        for t = (1+lag):T
+            for h = 1:H
+                # No Lagged
+                avg_obs = data_sim[t,h]
+                if t > 1
+                    avg_obs_tm1 = data_sim[t-1,h]
+                else
+                    avg_obs_tm1 = 0
+                end
+                m = zeros(j-i+1)
+
+                avg_h = mean(data_sim[:,h])
+                var_obs = (avg_obs - avg_h)^2
+                auto_cov_obs = (avg_obs - avg_h)*(avg_obs_tm1 - avg_h)
+
+                mom_obs_diff = [avg_obs, var_obs, auto_cov_obs] - mom_sim
+                # mom_obs_diff = [avg_obs, var_obs, auto_cov_obs] - mom_sim
+                mom_obs_diff = mom_obs_diff
+
+                # Lagged
+                avg_lag = data_sim[t-lag,h]
+                if t - lag > 1
+                    avg_lag_tm1 = data_sim[t-lag-1,h]
+                else
+                    avg_lag_tm1 = 0
+                end
+                avg_h = mean(data_sim[:,h])
+                var_lag = (avg_lag - avg_h)^2
+                auto_cov_lag = (avg_lag - avg_h)*(avg_lag_tm1 - avg_h)
+
+                mom_lag_diff = [avg_lag, var_lag,auto_cov_lag] - mom_sim
+                # mom_lag_diff = [avg_lag, var_lag, auto_cov_lag] - mom_sim
+                mom_lag_diff = mom_lag_diff
+                #print(mom_lag_diff)
+                #print(mom_obs_diff)
+
+                gamma_tot = gamma_tot .+ mom_obs_diff*mom_lag_diff'
             end
-            avg_h = mean(data_sim[:,h])
-            var_obs = (avg_obs - avg_h)^2
-            auto_cov_obs = (avg_obs - avg_h)*(avg_obs_tm1 - avg_h)
-
-            mom_obs_diff = [avg_obs, var_obs, auto_cov_obs] - mom_sim
-            # mom_obs_diff = [avg_obs, var_obs, auto_cov_obs] - mom_sim
-            mom_obs_diff = mom_obs_diff
-
-            # Lagged
-            avg_lag = data_sim[t-lag,h]
-            if t - lag > 1
-                avg_lag_tm1 = data_sim[t-lag-1,h]
-            else
-                avg_lag_tm1 = 0
-            end
-            avg_h = mean(data_sim[:,h])
-            var_lag = (avg_lag - avg_h)^2
-            auto_cov_lag = (avg_lag - avg_h)*(avg_lag_tm1 - avg_h)
-
-            mom_lag_diff = [avg_lag, var_lag,auto_cov_lag] - mom_sim
-            # mom_lag_diff = [avg_lag, var_lag, auto_cov_lag] - mom_sim
-            mom_lag_diff = mom_lag_diff
-            #print(mom_lag_diff)
-            #print(mom_obs_diff)
-
-            gamma_tot = gamma_tot .+ mom_obs_diff*mom_lag_diff'
         end
     end
+    if i ===1 && j == 2
+        mom_sim = [m_0[1], m_0[2]]
+        data_sim = y_t
+
+        # gamma_tot = zeros(length(prim.grid_l),length(prim.grid_l))
+        gamma_tot = zeros(2,2)
+
+        for t = (1+lag):T
+            for h = 1:H
+                # No Lagged
+                avg_obs = data_sim[t,h]
+                if t > 1
+                    avg_obs_tm1 = data_sim[t-1,h]
+                else
+                    avg_obs_tm1 = 0
+                end
+                avg_h = mean(data_sim[:,h])
+                var_obs = (avg_obs - avg_h)^2
+                auto_cov_obs = (avg_obs - avg_h)*(avg_obs_tm1 - avg_h)
+
+                mom_obs_diff = [avg_obs, var_obs] - mom_sim
+                # mom_obs_diff = [avg_obs, var_obs, auto_cov_obs] - mom_sim
+                mom_obs_diff = mom_obs_diff
+
+                # Lagged
+                avg_lag = data_sim[t-lag,h]
+                if t - lag > 1
+                    avg_lag_tm1 = data_sim[t-lag-1,h]
+                else
+                    avg_lag_tm1 = 0
+                end
+                avg_h = mean(data_sim[:,h])
+                var_lag = (avg_lag - avg_h)^2
+                auto_cov_lag = (avg_lag - avg_h)*(avg_lag_tm1 - avg_h)
+
+                mom_lag_diff = [avg_lag, var_lag] - mom_sim
+                # mom_lag_diff = [avg_lag, var_lag, auto_cov_lag] - mom_sim
+                mom_lag_diff = mom_lag_diff
+                #print(mom_lag_diff)
+                #print(mom_obs_diff)
+
+                gamma_tot = gamma_tot .+ mom_obs_diff*mom_lag_diff'
+            end
+        end
+    end
+    if i == 2 && j == 3
+        mom_sim = [m_0[2],m_0[3]]
+        data_sim = y_t
+
+        # gamma_tot = zeros(length(prim.grid_l),length(prim.grid_l))
+        gamma_tot = zeros(2,2)
+
+        for t = (1+lag):T
+            for h = 1:H
+                # No Lagged
+                avg_obs = data_sim[t,h]
+                if t > 1
+                    avg_obs_tm1 = data_sim[t-1,h]
+                else
+                    avg_obs_tm1 = 0
+                end
+                avg_h = mean(data_sim[:,h])
+                var_obs = (avg_obs - avg_h)^2
+                auto_cov_obs = (avg_obs - avg_h)*(avg_obs_tm1 - avg_h)
+
+                mom_obs_diff = [ var_obs, auto_cov_obs] - mom_sim
+                # mom_obs_diff = [avg_obs, var_obs, auto_cov_obs] - mom_sim
+                mom_obs_diff = mom_obs_diff
+
+                # Lagged
+                avg_lag = data_sim[t-lag,h]
+                if t - lag > 1
+                    avg_lag_tm1 = data_sim[t-lag-1,h]
+                else
+                    avg_lag_tm1 = 0
+                end
+                avg_h = mean(data_sim[:,h])
+                var_lag = (avg_lag - avg_h)^2
+                auto_cov_lag = (avg_lag - avg_h)*(avg_lag_tm1 - avg_h)
+
+                mom_lag_diff = [var_lag,auto_cov_lag] - mom_sim
+                # mom_lag_diff = [avg_lag, var_lag, auto_cov_lag] - mom_sim
+                mom_lag_diff = mom_lag_diff
+                #print(mom_lag_diff)
+                #print(mom_obs_diff)
+
+                gamma_tot = gamma_tot .+ mom_obs_diff*mom_lag_diff'
+            end
+        end
+    end
+
 
     gamma = (1/(T*H)).*gamma_tot
 
