@@ -3,36 +3,28 @@
 using Random, Parameters, DataFrames, Optim, Distributions, StatFiles, LinearAlgebra
 
 
-cd("C:/Users/mcket/OneDrive/Documents/Fall 2022/ECON899-Computational/899Code/JF_PS2")
+cd("C:/Users/mcket/OneDrive/Documents/Fall 2022/ECON899-Computational/899Code/JF_PS2") 
 
+
+##Bring in data
 data = DataFrame(load("Mortgage_performance_data1.dta"))
 
 
 y = data[!,"duration"]
-
+##Set y as our outcome vector
 
 
 y = Array(y)
 
 ind = ["score_0", "rate_spread", "i_large_loan", "i_medium_loan", "i_refinance", "age_r", "cltv", "dti", "cu", "first_mort_r", "i_FHA", "i_open_year2", "i_open_year3", "i_open_year4", "i_open_year5"]
-x = data[!,ind]
-z = data[!,["score_0", "score_1", "score_2"]]
+x = data[!,ind] ##
+z = data[!,["score_0", "score_1", "score_2"]] #Set our z vector
 insertcols!(x, 16, :const => 1) #add a constant
 x = Matrix(x)
 z = Matrix(z)
 beta = zeros(size(x,2)) #I counted sixteen variables in the problem set, plus a constant
 N= size(x,1)
 
-function draw_e(N, r, n::Int64=100)
-    e::Array{Float64,3} = zeros(N,3,n)
-
-    for x in 1:n
-        e[:,1,x] = rand(Normal(0,1/((1-r)^2)),N)
-        e[:,3,x] = rand(Normal(0,1),N)
-        e[:,2,x] = r.*e[:,1,x] + e[:,3,x]
-    end
-    return e
-end
 
 
 @with_kw struct parameters
@@ -58,50 +50,47 @@ end
 
 
 function Initialize()
-P = parameters()
-
-
-
+    P = parameters()
     return P
 end
-
-
-
-
-
 Random.seed!(1234)
 
+ #setting our seed
 
-like = zeros(P.N,3,4)
+#initializing array that will hold our likelihood function
 
 
-function ll_GHK(P,x)
+function ll_GHK(P,x)   ##Main GHK Function
     @unpack a0, a1,a2,b,g,rho = P
 
 
-    sim_matrix = zeros(100,2)
+    sim_matrix = zeros(100,2)  ##Initialize structures we will fill later
     like = zeros(P.N,3,4)
-    uni_dist = Uniform(0,1)
+    uni_dist = Uniform(0,1) #Call relevant distributions
     distrib = Normal(0,1)
 
 
     
 
-    for i = 1:P.N
-        for s = 1:100
-            sim_matrix[s,1] = rand(uni_dist)*(1-like[i,1,1])+like[i,1,1]
-
-
-
-        end
+    for i = 1:P.N   ##Looping through all mortgages
         for i =1:P.N
             for t=1:3
                # println(-a0-x[i,:]'*b-z[i,:]'*g)
-                like[i,t,1] = cdf(distrib,((-a0-sum(x[i,:]'*b)-sum(z[i,:]'*g))/(1-rho)))
+                like[i,t,1] = cdf(distrib,((-a0-sum(x[i,:]'*b)-sum(z[i,:]'*g))/(1-rho))) #Filling our likelihood function for T=1 
             end
         
         
         end
+
+
+
+
+        for s = 1:100 ##over 100 simulations
+            sim_matrix[s,1] = rand(uni_dist)*(1-like[i,1,1])+like[i,1,1] ##Draw epsilon_i0. We truncate by using the complement of the likelihood function for T=1
+
+
+        end
+        
 
 
         ###For t= 2
@@ -109,7 +98,7 @@ function ll_GHK(P,x)
         for t = 1:3
             for s = 1:100
                 like[i,t,2] += (1/100) * cdf(distrib,(((-a1-sum(x[i,:]'*b)-sum(z[i,:]'*g)-rho*sim_matrix[s,1]))))
-
+                #Fill our likelihood function for T=2 
 
 
             end
@@ -118,18 +107,18 @@ function ll_GHK(P,x)
 
 
         ###For T = 3
-        #First we calculate some etas
+        #First we calculate some etas because we will use the autocorrelation structure for epsilons moving forward 
         for t = 1:3
             for s = 1:100
                 eta = rand(uni_dist)*(1-like[i,1,2]+like[i,1,2])
-                sim_matrix[s,2]= rho*sim_matrix[s,1]+ eta
+                sim_matrix[s,2]= rho*sim_matrix[s,1]+ eta  ##Our new set of epsilons
             end
         end
 
 
         for t=1:3
             for s=1:100
-                like[i,t,3] += (1/100)*cdf(distrib, ((-a2-sum(x[i,:]'*b)-sum(z[i,:]'*g)-rho*sim_matrix[s,2])))#*pdf((distrib(sim_matrix[s,2]-rho*sim_matrix[s,1])))
+                like[i,t,3] += (1/100)*cdf(distrib, ((-a2-sum(x[i,:]'*b)-sum(z[i,:]'*g)-rho*sim_matrix[s,2])))#We fill our likeliohood function for T=3 
             end
 
         end
@@ -141,7 +130,7 @@ function ll_GHK(P,x)
 
         for t=1:3
             for s=1:100
-                like[i,t,4] += (1/100)*(1-cdf(distrib, ((-a2-sum(x[i,:]'*b)-sum(z[i,:]'*g)-rho*sim_matrix[s,2]))))#*pdf((distrib(sim_matrix[s,2]-rho*sim_matrix[s,1])))
+                like[i,t,4] += (1/100)*(1-cdf(distrib, ((-a2-sum(x[i,:]'*b)-sum(z[i,:]'*g)-rho*sim_matrix[s,2])))) #Fill likelihood for T=4
             end
 
         end
@@ -158,27 +147,23 @@ function ll_GHK(P,x)
 
 end
 
-like = ll_GHK(P,x)
 
-mean(like[:,:,1])
-findmin(like[:,1,4])
-std(y)
-mean(y)
 
-function log_like(P,x,like)
-    like = ll_GHK(P,x)
+
+function log_like(P,x)  ##Now we solve for the log likelihood 
+    like = ll_GHK(P,x) ##Run our  ghk function
     like_step = zeros(P.N,3)
     for i = 1:P.N 
-        like_step[i,:] = like[i,:,Int64(y[i])]
+        like_step[i,:] = like[i,:,Int64(y[i])] ##We get the likelihoods in each of the 3 time periods
     end
 
 
     total = 0
 
     like_total = zeros(P.N)
-    for i = 1:P.N 
+    for i = 1:P.N ##We add all of our likelihoods across each time index together
         if Int64(y[i]) == 1
-            like_total[i] = like_step[i,1]
+            like_total[i] = like_step[i,1] 
         elseif Int64(y[i]) == 2
             like_total[i] = like_step[i,2]
         else Int64(y[i]) > 2
@@ -187,12 +172,16 @@ function log_like(P,x,like)
     end
 
     for i = 1:P.N 
-        total += log(like_total[i])
+        total += log(like_total[i]) ##Taking the log, we get the log likelihood for our model. 
     end
 
     return like, total 
 
 end
+
+
+
+
 
 
 
