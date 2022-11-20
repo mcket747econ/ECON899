@@ -1,0 +1,12 @@
+using Random, Parameters, DataFrames, Optim, Distributions, StatFiles, LinearAlgebra
+cd("C:/Users/mcket/OneDrive/Documents/Fall 2022/ECON899-Computational/899Code/JF_PS2")
+
+
+
+include("jf_ps2_ghk.jl")
+P = Initialize()
+
+
+
+like,total = ll_GHK(P,x)
+
