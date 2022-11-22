@@ -4,7 +4,7 @@ pyplot()
 
 cd("C:\\Users\\Rafeh\\Documents\\GitHub\\ECON899\\PS2_JF")
 df = DataFrame(load("Mortgage_performance_data.dta"))
-names(df) |> print
+# names(df) |> println
 
 ##declare matrices
 Y::Array{Float64,2} =  df[:,["i_close_0","i_close_1","i_close_2"]]  |> Matrix
@@ -20,6 +20,7 @@ Z::Array{Float64,2} = df[:,["score_0", "score_1", "score_2"]] |>Matrix
 α = 0,-1,-1
 γ = [0.3,0.3,0.3]
 ρ = 0.5
+σ = 1/abs(1-ρ)
 
 
 ## My understanding
@@ -31,58 +32,77 @@ T[((Y[:,1].==0) .& (Y[:,2].==0)) .& (Y[:,3].==0),1] .=4
 
 
 ##Likelihood funcitons for t∈{2,3,4}
-function lfunct1(x,bd1)
-  cdf.(Normal(),(-bd1-ρ*x).*
-  pdf.(Normal(),(x/σ)/σ
+##1-D - T=2
+#val1 = $α_0+X_iβ + Z_it γ
+#val1 = $α_1+X_iβ + Z_it γ
+#val1 = $α_1+X_iβ + Z_it γ
+
+# bound1=α[1]+X[i,:]'*β+Z[i,:]'*γ
+# bound2=α[2]+X[i,:]'*β+Z[i,:]'*γ
+# bound3=α[3]+X[i,:]'*β+Z[i,:]'*γ
+
+function lfunct1(x,val)
+  cdf.(Normal(),(-val-ρ*x)).*
+  pdf.(Normal(),(x/σ)/σ)
 end 
 
-function lfunct2(x,y,bd2)
-  cdf.(Normal(),(-bd2-ρ*x).*
-  pdf.(Normal(),(x- ρ*y)
-  pdf.(Normal(),(y/σ)/σ
+##2-D - T=3
+function lfunct2(x,y,val)
+  cdf.(Normal(),(-val-ρ*x)).*
+  pdf.(Normal(),(x- ρ*y))
+  pdf.(Normal(),(y/σ)/σ)
 end 
 
-function lfunct3(x,y,bd3)
-  cdf.(Normal(),(bd3-ρ*x).*
-  pdf.(Normal(),(x- ρ*y)
-  pdf.(Normal(),(y/σ)/σ
+##1-D - T=4
+function lfunct3(x,y,val)
+  cdf.(Normal(),(val-ρ*x)).*
+  pdf.(Normal(),(x- ρ*y))
+  pdf.(Normal(),(y/σ)/σ)
 end 
 
 ##transformation functions
 function rho(u,b)
-  log(u)+b, 1/u
+  log(u)+b
 end
-function rhoprime(u,b)
+function rhoprime(u)
   1/u
 end
 
 ##1-D - T=2
-function sumlhood1(x,w)
+function sumlhood1(x,w,α,val0)
   sum = 0
   for j in 1:size(x,1)
-    sum+=w[j].*lfunct1(rho(x[j],bd1),bd1).*rhoprime(x[j])
+    sum+=w[j].*lfunct1(rho(x[j],α[1]+val0),α[2]+val0).*rhoprime(x[j])
   end
   sum
 end
 
-
 ## T=3 (2-D)
-function sumlhood2(x,w)
+function sumlhood2(x,w,α,val0)
   sum = 0
   for j in 1:size(x,1)
-    sum+=w[j].*lfunct2(rho(x[j,1],bd1),rho(x[j,2],bd2),bd2).*rhoprime(x[j,1]).*rhoprime(x[j,2])
+    # println(rho(x[j,1],val1),", ",rho(x[j,2],val2),", ",rhoprime(x[j,1]),", ",rhoprime(x[j,2])
+    sum+=w[j].*lfunct2(rho(x[j,1],α[2]+val0),rho(x[j,2],α[1]+val0),α[3]+val0).*rhoprime(x[j,1]).*rhoprime(x[j,2])
   end
   sum
 end
 
 ##T=4 (2-D)
-function sumlhood3(x,w)
+function sumlhood3(x,w,α,val0)
   sum = 0
   for j in 1:size(x,1)
-    sum+=w[j].*lfunct2(rho(x[j,1],bd1),rho(x[j,2],bd2),bd3).*rhoprime(x[j,1]).*rhoprime(x[j,2])
+    sum+=w[j].*lfunct3(rho(x[j,1],α[2]+val0),rho(x[j,2],α[1]+val0),α[3]+val0).*rhoprime(x[j,1]).*rhoprime(x[j,2])
   end
   sum
 end
+
+
+# for j in 1:5
+#   println(x2[j,1])
+#   println(rho(x2[j,1],bound1),", ",rho(x2[j,2],bound2),", ",rhoprime(x2[j,1]),", ",rhoprime(x2[j,2]))
+#   # w2[j]*lfunct3(rho(x2[j,1],bound1),rho(x2[j,2],bound2),bound3).*rhoprime(x2[j,1]).*rhoprime(x2[j,2]) |>println
+# end
+
 
 
 k=1
@@ -92,25 +112,55 @@ k=2
 x2 = readdlm("X"*string(k)*".csv",',', Float64)
 w2 = readdlm("w"*string(k)*".csv",',', Float64)
 
+
+alllhood = function(β)
+  PrT = zeros(size(Y,1))
+  for i in 1:size(X,1)
+    val0=X[i,:]'*β+Z[i,:]'*γ
+    if T[i]==1
+      PrT[i] = cdf.(Normal(),(α[1]+val0)./σ)
+    end 
+    if T[i]==2
+      PrT[i] = sumlhood1(x1,w1,α,val0)
+    end
+    if T[i]==3
+      PrT[i] = sumlhood2(x2,w2,α,val0)
+    end
+    if T[i]==4
+      PrT[i] = sumlhood3(x2,w2,α,val0)
+    end
+  end 
+  sum(PrT)
+end
+alllhood(β)
+
 ## Define likelidhood
-PrT = zeros(size(Y,1))
-for i in 1:N
-  bound1=α[1]+X[i]*β+Z[i,:]*γ
-  bound2=α[2]+X[i]*β+Z[i,:]*γ
-  bound3=α[3]+X[i]*β+Z[i,:]*γ
-  if T[i]==1
-    PrT[i] = cdf.(Normal(),(bound1)./σ)
-  end
-  if T[i]==2
-    PrT[i] = sumlhood1(x1,w1)
-  end
-  if T[i]==3
-    PrT[i] = sumlhood2(x2,w2)
-  end
-  if T[i]==4
-    PrT[i] = sumlhood3(x2,w2)
-  end
-end 
+# alllhood = function(β)
+#   PrT = zeros(size(Y,1))
+#   for i in 1:size(X,1)
+#     val0=X[i,:]'*β+Z[i,:]'*γ
+#     if T[i]==1
+#       PrT[i] = cdf.(Normal(),(α[1]+val0)./σ)
+#     end 
+#     if T[i]==2
+#       PrT[i] = sumlhood1(x1,w1,α,val0)
+#     end
+#     if T[i]==3
+#       PrT[i] = sumlhood2(x2,w2,α,val0)
+#     end
+#     if T[i]==4
+#       PrT[i] = sumlhood3(x2,w2,α,val0)
+#     end
+#   end 
+#   sum(PrT)
+# end
+# alllhood(β)
+
+# Res = optimize(alllhood,zeros(length(β)),ones(length(β)))          # println(Res)
+
+
+
+
 ##########################
 ## Not necessary at all ##
 ##########################
