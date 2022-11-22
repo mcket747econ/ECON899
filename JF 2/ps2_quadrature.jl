@@ -49,14 +49,14 @@ end
 ##2-D - T=3
 function lfunct2(x,y,val)
   cdf.(Normal(),(-val-ρ*x)).*
-  pdf.(Normal(),(x- ρ*y))
+  pdf.(Normal(),(x- ρ*y)).*
   pdf.(Normal(),(y/σ)/σ)
 end 
 
 ##1-D - T=4
 function lfunct3(x,y,val)
   cdf.(Normal(),(val-ρ*x)).*
-  pdf.(Normal(),(x- ρ*y))
+  pdf.(Normal(),(x- ρ*y)).*
   pdf.(Normal(),(y/σ)/σ)
 end 
 
@@ -87,6 +87,8 @@ function sumlhood2(x,w,α,val0)
   sum
 end
 
+# j= 1
+# w2[j].*lfunct3(rho(x2[j,1],α[2]+val0),rho(x2[j,2],α[1]+val0),α[3]+val0).*rhoprime(x2[j,1]).*rhoprime(x2[j,2])
 ##T=4 (2-D)
 function sumlhood3(x,w,α,val0)
   sum = 0
@@ -112,13 +114,29 @@ k=2
 x2 = readdlm("X"*string(k)*".csv",',', Float64)
 w2 = readdlm("w"*string(k)*".csv",',', Float64)
 
-
+# PrT = zeros(size(Y,1))
+# for i in 1:size(X,1)
+#   val0=X[i,:]'*β+Z[i,:]'*γ
+#   if T[i]==1
+#     PrT[i] = cdf.(Normal(),(α[1]+val0)./σ)
+#   end 
+#   if T[i]==2
+#     PrT[i] = sumlhood1(x1,w1,α,val0)
+#   end
+#   if T[i]==3
+#     PrT[i] = sumlhood2(x2,w2,α,val0)
+#   end
+#   if T[i]==4
+#     PrT[i] = sumlhood3(x2,w2,α,val0)
+#   end
+# end 
+# sum(PrT)
 alllhood = function(β)
   PrT = zeros(size(Y,1))
   for i in 1:size(X,1)
     val0=X[i,:]'*β+Z[i,:]'*γ
     if T[i]==1
-      PrT[i] = cdf.(Normal(),(α[1]+val0)./σ)
+      PrT[i] = cdf.(Normal(),(-α[1]-val0)./σ)
     end 
     if T[i]==2
       PrT[i] = sumlhood1(x1,w1,α,val0)
@@ -130,9 +148,30 @@ alllhood = function(β)
       PrT[i] = sumlhood3(x2,w2,α,val0)
     end
   end 
-  sum(PrT)
+  PrT
 end
-alllhood(β)
+PrT = alllhood(β)
+
+sumlhood = function(β)
+  sum(alllhood(β))
+end
+
+optimize(sumlhood,zeros(length(β)))
+
+d = DataFrame(T=T,PrT=PrT)
+d = hcat(d,DataFrame(Y,:auto))
+##
+gd = groupby(d, :T)
+c = combine(gd, :PrT => mean)
+c[!,:norm] =c[!,:PrT_mean]./sum(c[!,:PrT_mean])
+c
+gd = groupby(DataFrame(T=T,indic=ones(length(T))), :T)
+c = combine(gd, :indic => sum)
+c[!,:indic] = c[!,:indic_sum]./sum(c[!,:indic_sum])
+c
+
+
+
 
 ## Define likelidhood
 # alllhood = function(β)
