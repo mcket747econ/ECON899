@@ -28,9 +28,9 @@ rho::Float64 = 0.5
 
 ##Question 3
 
-function draw_e(N, r, n::Int64=100)
+function draw_e(N, r, n::Int64=100, seed=12345)
     e::Array{Float64,3} = zeros(N,3,n)
-    
+    Random.seed!(seed)
     for x in 1:n 
         e[:,1,x] = rand(Normal(0,1/((1-r)^2)),N)
         e[:,3,x] = rand(Normal(0,1),N)
@@ -93,22 +93,34 @@ function ll_ar(b,g, x, z, y, N, a0::Int64 = 0, a1::Int64 = -1,a2::Int64 = -1, r:
     P::Array{Float64,1} = zeros(N)
     ll = 0 
     prob = 0
+    pseudo::Array{Float64,2} = zeros(N,5)
     for i in 1:N
+        pseudo[i,1] = cdf.(Normal(0,1),(-a0-x[i,:]'*b-z[i,:]'*g)/s)
+        pseudo[i,2] = ar2(e[i,1,:],x[i,:],z[i,:],b,g,a0,a1,n,r,s)
+        pseudo[i,3] = ar3(e[i,:,:],x[i,:],z[i,:],b,g,a0,a1,a2,n,r,s)
+        pseudo[i,4] = ar4(e[i,:,:],x[i,:],z[i,:],b,g,a0,a1,a2,n,r,s)
         if y[i] == 1
-            P[i] = cdf.(Normal(0,1),(-a0-x[i,:]'*b-z[i,:]'*g)/s)
+            P[i] = pseudo[i,1]
+            pseudo[i,5] = 1
         elseif y[i] ==2
-            P[i] = ar2(e[i,1,:],x[i,:],z[i,:],b,g,a0,a1,n,r,s)
+            P[i] = pseudo[i,2]
+            pseudo[i,5] = 2
         elseif y[i] ==3
-            P[i] = ar3(e[i,:,:],x[i,:],z[i,:],b,g,a0,a1,a2,n,r,s)
+            P[i] = pseudo[i,3]
+            pseudo[i,5] = 3
         else
-            P[i] = ar4(e[i,:,:],x[i,:],z[i,:],b,g,a0,a1,a2,n,r,s)
+            P[i] = pseudo[i,4]
+            pseudo[i,5] = 4
         end
         prob = -log(max(0,P[i]))
         ll += prob 
     end
-    return ll 
+    return ll, pseudo 
 end
 
-ll_ar(beta,gamma,x,z,y,N)
+ res, prob = ll_ar(beta,gamma,x,z,y,N)
 
-#10033 is y=1
+ println("Average Probability T=1 over all observations: ", mean(prob[:,1]))
+ println("Average Probability T=2 over all observations: ", mean(prob[:,2]))
+ println("Average Probability T=3 over all observations: ", mean(prob[:,3]))
+ println("Average Probability T=4 over all observations: ", mean(prob[:,4]))
