@@ -33,28 +33,20 @@ T[((Y[:,1].==0) .& (Y[:,2].==0)) .& (Y[:,3].==0),1] .=4
 
 ##Likelihood funcitons for t∈{2,3,4}
 ##1-D - T=2
-#val1 = $α_0+X_iβ + Z_it γ
-#val1 = $α_1+X_iβ + Z_it γ
-#val1 = $α_1+X_iβ + Z_it γ
-
-# bound1=α[1]+X[i,:]'*β+Z[i,:]'*γ
-# bound2=α[2]+X[i,:]'*β+Z[i,:]'*γ
-# bound3=α[3]+X[i,:]'*β+Z[i,:]'*γ
-
-function lfunct1(x,val)
+function lfunct2(x,val,ρ=ρ,σ=σ)
   cdf.(Normal(),(-val-ρ*x)).*
   pdf.(Normal(),(x/σ)/σ)
 end 
 
 ##2-D - T=3
-function lfunct2(x,y,val)
+function lfunct3(x,y,val,ρ=ρ,σ=σ)
   cdf.(Normal(),(-val-ρ*x)).*
   pdf.(Normal(),(x- ρ*y)).*
   pdf.(Normal(),(y/σ)/σ)
 end 
 
 ##1-D - T=4
-function lfunct3(x,y,val)
+function lfunct4(x,y,val,ρ=ρ,σ=σ)
   cdf.(Normal(),(val-ρ*x)).*
   pdf.(Normal(),(x- ρ*y)).*
   pdf.(Normal(),(y/σ)/σ)
@@ -69,20 +61,20 @@ function rhoprime(u)
 end
 
 ##1-D - T=2
-function sumlhood1(x,w,α,val0)
+function sumlhood2(x,xmult,w,α,val0)
   sum = 0
   for j in 1:size(x,1)
-    sum+=w[j].*lfunct1(rho(x[j],α[1]+val0),α[2]+val0).*rhoprime(x[j])
+    sum+=w[j].*lfunct2(x[j]+α[1]+val0,α[2]+val0).*xmult[j]
   end
   sum
 end
 
 ## T=3 (2-D)
-function sumlhood2(x,w,α,val0)
+function sumlhood3(x,xmult,w,α,val0)
   sum = 0
   for j in 1:size(x,1)
     # println(rho(x[j,1],val1),", ",rho(x[j,2],val2),", ",rhoprime(x[j,1]),", ",rhoprime(x[j,2])
-    sum+=w[j].*lfunct2(rho(x[j,1],α[2]+val0),rho(x[j,2],α[1]+val0),α[3]+val0).*rhoprime(x[j,1]).*rhoprime(x[j,2])
+    sum+=w[j].*lfunct3(x[j,1]+α[2]+val0,x[j,2]+α[1]+val0,α[3]+val0).*xmult[j]
   end
   sum
 end
@@ -90,22 +82,13 @@ end
 # j= 1
 # w2[j].*lfunct3(rho(x2[j,1],α[2]+val0),rho(x2[j,2],α[1]+val0),α[3]+val0).*rhoprime(x2[j,1]).*rhoprime(x2[j,2])
 ##T=4 (2-D)
-function sumlhood3(x,w,α,val0)
+function sumlhood4(x,xmult,w,α,val0)
   sum = 0
   for j in 1:size(x,1)
-    sum+=w[j].*lfunct3(rho(x[j,1],α[2]+val0),rho(x[j,2],α[1]+val0),α[3]+val0).*rhoprime(x[j,1]).*rhoprime(x[j,2])
+    sum+=w[j].*lfunct4(x[j,1]+α[2]+val0,x[j,1]+α[1]+val0,α[3]+val0).*xmult[j]
   end
   sum
 end
-
-
-# for j in 1:5
-#   println(x2[j,1])
-#   println(rho(x2[j,1],bound1),", ",rho(x2[j,2],bound2),", ",rhoprime(x2[j,1]),", ",rhoprime(x2[j,2]))
-#   # w2[j]*lfunct3(rho(x2[j,1],bound1),rho(x2[j,2],bound2),bound3).*rhoprime(x2[j,1]).*rhoprime(x2[j,2]) |>println
-# end
-
-
 
 k=1
 x1 = readdlm("X"*string(k)*".csv",',', Float64)
@@ -114,49 +97,62 @@ k=2
 x2 = readdlm("X"*string(k)*".csv",',', Float64)
 w2 = readdlm("w"*string(k)*".csv",',', Float64)
 
-# PrT = zeros(size(Y,1))
-# for i in 1:size(X,1)
-#   val0=X[i,:]'*β+Z[i,:]'*γ
-#   if T[i]==1
-#     PrT[i] = cdf.(Normal(),(α[1]+val0)./σ)
-#   end 
-#   if T[i]==2
-#     PrT[i] = sumlhood1(x1,w1,α,val0)
-#   end
-#   if T[i]==3
-#     PrT[i] = sumlhood2(x2,w2,α,val0)
-#   end
-#   if T[i]==4
-#     PrT[i] = sumlhood3(x2,w2,α,val0)
-#   end
-# end 
-# sum(PrT)
-alllhood = function(β)
+
+## Preallocate whatever I can for speed
+rhomat_x1 = log.(x1)
+x1mult = rhoprime.(x1)
+
+rhoprimemat = rhoprime.(x2)
+rhomat_x2 = log.(x2)
+x2mult = zeros(size(x2,1))
+for k in 1:size(x2mult,1)
+  x2mult[k] = rhoprimemat[k,1].*rhoprimemat[k,2]
+end
+
+
+alllhood = function(β,α=α)
   PrT = zeros(size(Y,1))
+  val0 = zeros(size(Y,1))
   for i in 1:size(X,1)
-    val0=X[i,:]'*β+Z[i,:]'*γ
+    val0[i]=X[i,:]'*β+Z[i,:]'*γ
+  end
+  for i in 1:size(X,1)
     if T[i]==1
-      PrT[i] = cdf.(Normal(),(-α[1]-val0)./σ)
-    end 
-    if T[i]==2
-      PrT[i] = sumlhood1(x1,w1,α,val0)
-    end
-    if T[i]==3
-      PrT[i] = sumlhood2(x2,w2,α,val0)
-    end
-    if T[i]==4
-      PrT[i] = sumlhood3(x2,w2,α,val0)
+      PrT[i] = cdf.(Normal(),(-α[1]-val0[i])./σ)
+    elseif T[i]==2
+      PrT[i] = sumlhood2(rhomat_x1,x1mult,w1,α,val0[i])
+    elseif T[i]==3
+      PrT[i] = sumlhood3(rhomat_x2,x2mult,w2,α,val0[i])
+    elseif T[i]==4
+      PrT[i] = sumlhood4(rhomat_x2,x2mult,w2,α,val0[i])
     end
   end 
   PrT
 end
-PrT = alllhood(β)
 
+
+# alllhood = function(β,α=α)
+#   PrT = zeros(size(Y,1))
+#   for i in 1:size(X,1)
+#     val0=X[i,:]'*β+Z[i,:]'*γ
+#     if T[i]==1
+#       PrT[i] = cdf.(Normal(),(-α[1]-val0)./σ)
+#     elseif T[i]==2
+#       PrT[i] = sumlhood2(x1,w1,α,val0)
+#     elseif T[i]==3
+#       PrT[i] = sumlhood3(x2,w2,α,val0)
+#     elseif T[i]==4
+#       PrT[i] = sumlhood4(x2,w2,α,val0)
+#     end
+#   end 
+#   PrT
+# end
+@time PrT = alllhood(β)
 sumlhood = function(β)
   sum(alllhood(β))
 end
 
-optimize(sumlhood,zeros(length(β)))
+@time res = optimize(sumlhood, zeros(length(β)),method=LBFGS())
 
 d = DataFrame(T=T,PrT=PrT)
 d = hcat(d,DataFrame(Y,:auto))
@@ -199,6 +195,46 @@ c
 
 
 
+# PrT = zeros(size(Y,1))
+# for i in 1:size(X,1)
+#   val0=X[i,:]'*β+Z[i,:]'*γ
+#   if T[i]==1
+#     PrT[i] = cdf.(Normal(),(α[1]+val0)./σ)
+#   end 
+#   if T[i]==2
+#     PrT[i] = sumlhood1(x1,w1,α,val0)
+#   end
+#   if T[i]==3
+#     PrT[i] = sumlhood2(x2,w2,α,val0)
+#   end
+#   if T[i]==4
+#     PrT[i] = sumlhood3(x2,w2,α,val0)
+#   end
+# end 
+# sum(PrT)
+
+# see1 = function(β)
+#   for k in 1:10
+#   for i in 1:size(X,1)
+#     val0=X[i,:]'*β+Z[i,:]'*γ
+#   end
+#   end
+# end
+
+# see2 = function(β)
+#   lenX = size(X,2)
+#   for k in 1:10
+#   for i in 1:size(X,1)
+#     val0=Z[i,1].*γ[1] + Z[i,2].*γ[2]
+#     for j2 in lenX
+#       val0+= X[i,j2].*β[j2]
+#     end
+#   end
+#   end
+# end
+
+# @time see1(β)
+# @time see2(β)
 
 ##########################
 ## Not necessary at all ##
