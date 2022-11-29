@@ -6,23 +6,87 @@ ind_characteristics = DataFrame(load("C:/Users/mcket/OneDrive/Documents/Fall 202
 car_ch = DataFrame(load("C:/Users/mcket/OneDrive/Documents/Fall 2022/ECON899-Computational/899Code/JF_PS3/PS3/Car_demand_characteristics_spec1.dta"))
 iv_specification = DataFrame(load("C:/Users/mcket/OneDrive/Documents/Fall 2022/ECON899-Computational/899Code/JF_PS3/PS3/Car_demand_iv_spec1.dta"))
 
-car_ar = convert(Array, car_ch)
+delta_iia = Vector(car_ch[:,"delta_iia"])
+simdist = Vector(ind_characteristics[:,"Var1"])
+sim
 Ma
 car_ch[,]
 price_vector = zeros(6103,31 )
 z = zeros(31,1)
+share_ch = Vector(car_ch[:,"share"])
 
-Array(car_ch)
+carch_ch_mt = Matrix(car_ch)
+mz = Vector(car_ch[:,"price"])
+mz1 = Vector(car_ch[:,"price"])
 
+mz_test = Array{Float64,2}
+mz_test = zeros(6103,2)
+mz_test[:,1] = mz1
+mz_test[:,2] = x
+prices = car_p[xyz1]
 
+Random.seed!(1234)
+x = rand(Uniform(10,20),6103)
+xyz = getindex(carch_ch_mt[:,2],1997)
+xyz1 = findall(x->x==1985,carch_ch_mt[:,2])
+xyz2 = findall(x->x==1985,carch_ch_mt[:,2])
+xyz3 = findall(x->x==1985,carch_ch_mt[:,2])
 
+xy = [xyz1,xyz2,xyz3]
+xy[1]
+years = unique(car_ch[:,"Year"])
 
+function precompute(carch_ch_mt,years,produc_t)
+    produc_1 = 0
+    for i = 1:31
+        produc_1 = findall(x->x==years[i],carch_ch_mt[:,2])
+        push!(produc_t,produc_1)
 
+    end
+    return produc_t
 end
 
+xy = Array{Float64,2}
+xyz = Array{Float64,3}
+xyz = zeros()
+xyz[:,:,1] = xy
+function individual_char()
+    Zf = Array{Array{Float64,2},1}()
+    Z = zeros(31,1)
+    for i=1:31
+        for j=1:1
+            Z = mz[Int64.(produc_t[i])]*simdist' 
+            push!(Zf,Z)
+            #Zf[i,j] = Z
 
+        end
+    end
+    return Zf
+end
 
+A = zeros(31)
+A[1] = Matrix{Float64}
+typeof(A[:,1])  
+typeof(Z_test)
+A[:,:,1] = Z_test
+Z_test = individual_char()
+Z = individual_char()
+Z_fin = Matrix{Float64}
+Z_again = hcat(Z, Z_test)
+Z_fin = zeros(31,2)
+xy =[Z Z_test]
+Z_fin[:,1] = Z_test
+A = [f(a[i], b[j]) for i = 1:2, j = 1:3]
+2×3 Matrix{Int64}:
+produc_t = precompute(carch_ch_mt,years,produc_t)
+prices = mz[Int64.(produc_t[1])]
+mz = Matrix()
+Array{Matrix{Float64},1}()
+produc_t = Array{Array{Float64,1},1}()
+produc_t[1]
 
+a = [1,2]
+push!(produc_t,[1.0,2.0,3.0])
 
 function make_price()
     price_vec = zeros(6103,31)
@@ -36,7 +100,7 @@ function make_price()
     return price_vec
 end
 
-
+simdist'
 
 
 
@@ -44,7 +108,77 @@ price_vector = make_price()
 
 mz = car_ch[:,"price"]
 
+function value(lambda,t)
+    mu = Array{Float64,2}
+    l = 1 ##Number of nonlinear attributes
+    mu = lambda.*Z[t]
+    mu_exp = exp.(mu)
+    return mu_exp
+end
 
+
+test = exp.(delta_iia[Int64.(produc_t[1])]).*value(0.6,1)
+ms = test./(1 .+ sum_cols)
+sum_cols = sum(test,dims=1)
+mean(ms, dims=2)
+mat2 = ms*ms'./100
+ms.*(1 .- ms)
+Diagonal(mean(ms.*(1 .- ms),))
+function demand(mu,t,jacobian,delta,produc_t)
+    ev = exp.(delta_iia[Int64.(produc_t[t])]).*mu
+    market_share = ev./(1.+ ev)
+    shat = mean(market_share,dims=2)
+    return market_share, shat
+
+end
+function jacobian(ms,)
+
+    square = ms*(1 .- ms)'
+    jacob = square./100 *I .-  (mat2 - mat2*I)/100
+    return jacob
+
+end
+
+
+
+function inverse(epsilon::Float64,share_ch)
+for t = 1:T
+    value(lambda,t)
+    rowid = produc_t[t]
+    f = 100
+    if norm(f) > eps1
+        jacobian = 0
+        ms, shat= demand(mu,t,jacobian,delta,produc_t)
+        jacob = jacobian(ms,)
+        f = log(share_ch[rowid])-log(shat)
+        delta_iia[rowid] = delta_iia[rowid] + f
+        res_norm[t] = norm(f)
+    else 
+        if norm(f) > eps0
+            jacobian = 1
+            ms,shat = demand(mu,t,jacobian,delta_produc_t)
+            f = log(share_ch[rowid])-log(shat)
+            jacobian = jacobian(ms,)
+            delta_iia[rowid] .= delta_iia[rowid] .+ invert(jacobian./shat).*f
+            res_norm[t] = norm(f)                                   
+        end
+
+    end
+
+    return 
+
+
+end
+ 
+
+
+square = ms*(1 .- ms)'
+
+(mat2 - mat2*I)
+1 .- I
+mat2*I
+mean(square,dims=2)
+exp.(delta_iia[Int64.(produc_t[1])])
 "]
 car_ch[:,Model][5]
 
@@ -159,6 +293,10 @@ function routine_overall()
 
 
 end
+
+
+
+
 
 
 
