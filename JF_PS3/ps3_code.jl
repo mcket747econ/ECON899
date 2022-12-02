@@ -6,11 +6,50 @@ ind_characteristics = DataFrame(load("C:/Users/mcket/OneDrive/Documents/Fall 202
 car_ch = DataFrame(load("C:/Users/mcket/OneDrive/Documents/Fall 2022/ECON899-Computational/899Code/JF_PS3/PS3/Car_demand_characteristics_spec1.dta"))
 iv_specification = DataFrame(load("C:/Users/mcket/OneDrive/Documents/Fall 2022/ECON899-Computational/899Code/JF_PS3/PS3/Car_demand_iv_spec1.dta"))
 
-delta_iia = Vector(car_ch[:,"delta_iia"])
-simdist = Vector(ind_characteristics[:,"Var1"])
-sim
-Ma
-car_ch[,]
+
+
+
+
+
+@with_kw struct Param
+    T::Int64 = length(unique(car_ch[:,"Year"]))  ##The number of markets(Years)
+    delta_iia::Array{Float64,1} = Vector(car_ch[:,"delta_iia"]) ##the iia delta values
+    simdist::Array{Float64,1} = Vector(ind_characteristics[:,"Var1"]) ##Vector containing the simulated individual characteristics
+    mz::Array{Float64,1} = Vector(car_ch[:,"price"]) ##Vector containing prices for all models
+    lambda::Float64 = 0.6
+    eps1::Float64 = 1 
+    eps0::Float64 = 10e-12
+    years::Array{Float64,1}= sort(unique(car_ch[:,"Year"]))
+
+
+
+
+
+
+
+
+end
+
+@with_kw mutable struct Results
+
+
+
+
+
+
+end 
+
+
+sort(years)
+@with_kw function Initialize()
+    P = Param()
+
+
+    return P 
+end 
+
+
+
 price_vector = zeros(6103,31 )
 z = zeros(31,1)
 share_ch = Vector(car_ch[:,"share"])
@@ -27,15 +66,16 @@ prices = car_p[xyz1]
 
 Random.seed!(1234)
 x = rand(Uniform(10,20),6103)
-xyz = getindex(carch_ch_mt[:,2],1997)
-xyz1 = findall(x->x==1985,carch_ch_mt[:,2])
-xyz2 = findall(x->x==1985,carch_ch_mt[:,2])
-xyz3 = findall(x->x==1985,carch_ch_mt[:,2])
+# xyz = getindex(carch_ch_mt[:,2],1997)
+# xyz1 = findall(x->x==1985,carch_ch_mt[:,2])
+# xyz2 = findall(x->x==1985,carch_ch_mt[:,2])
+# xyz3 = findall(x->x==1985,carch_ch_mt[:,2])
 
 xy = [xyz1,xyz2,xyz3]
 xy[1]
 years = unique(car_ch[:,"Year"])
 
+# Creating a product_id_code
 function precompute(carch_ch_mt,years,produc_t)
     produc_1 = 0
     for i = 1:31
@@ -46,12 +86,15 @@ function precompute(carch_ch_mt,years,produc_t)
     return produc_t
 end
 
-xy = Array{Float64,2}
-xyz = Array{Float64,3}
-xyz = zeros()
-xyz[:,:,1] = xy
+
+
+# xy = Array{Float64,2}
+# xyz = Array{Float64,3}
+# xyz = zeros()
+# xyz[:,:,1] = xy
+
 function individual_char()
-    Zf = Array{Array{Float64,2},1}()
+    Zf = Array{Array{Float64,2},1}() ##Structure that will contain all the prices associated with products in a particular market(Year)
     Z = zeros(31,1)
     for i=1:31
         for j=1:1
@@ -108,7 +151,7 @@ price_vector = make_price()
 
 mz = car_ch[:,"price"]
 
-function value(lambda,t)
+function value(lambda,t)   ##Evaluating the value of individual characteristics,and prices u
     mu = Array{Float64,2}
     l = 1 ##Number of nonlinear attributes
     mu = lambda.*Z[t]
@@ -124,7 +167,8 @@ mean(ms, dims=2)
 mat2 = ms*ms'./100
 ms.*(1 .- ms)
 Diagonal(mean(ms.*(1 .- ms),))
-function demand(mu,t,jacobian,delta,produc_t)
+
+function demand(mu,t,jacobian,delta,produc_t) ##Creating the Demand Function
     ev = exp.(delta_iia[Int64.(produc_t[t])]).*mu
     market_share = ev./(1.+ ev)
     shat = mean(market_share,dims=2)
@@ -142,33 +186,39 @@ end
 
 
 function inverse(epsilon::Float64,share_ch)
-for t = 1:T
-    value(lambda,t)
-    rowid = produc_t[t]
-    f = 100
-    if norm(f) > eps1
-        jacobian = 0
-        ms, shat= demand(mu,t,jacobian,delta,produc_t)
-        jacob = jacobian(ms,)
-        f = log(share_ch[rowid])-log(shat)
-        delta_iia[rowid] = delta_iia[rowid] + f
-        res_norm[t] = norm(f)
-    else 
-        if norm(f) > eps0
-            jacobian = 1
-            ms,shat = demand(mu,t,jacobian,delta_produc_t)
+    for t = 1:T
+        value(lambda,t)
+        rowid = produc_t[t]
+        f = 100
+        res_norm = zeros(T,500)
+        i = 1
+        if norm(f) > eps1
+            jacobian = 0
+            ms, shat= demand(mu,t,jacobian,delta,produc_t)
+            jacob = jacobian(ms,)
             f = log(share_ch[rowid])-log(shat)
-            jacobian = jacobian(ms,)
-            delta_iia[rowid] .= delta_iia[rowid] .+ invert(jacobian./shat).*f
-            res_norm[t] = norm(f)                                   
+            delta_iia[rowid] = delta_iia[rowid] + f
+            res_norm[t, i] = norm(f)
+            i += 1
+        else 
+            if norm(f) > eps0
+                jacobian = 1
+                ms,shat = demand(mu,t,jacobian,delta_produc_t)
+                f = log(share_ch[rowid])-log(shat)
+                jacobian = jacobian(ms,)
+                delta_iia[rowid] .= delta_iia[rowid] .+ invert(jacobian./shat).*f
+                res_norm[t] = norm(f)                                   
+            end
+
         end
-
     end
+    return res_norm, 
+end 
 
-    return 
 
 
-end
+
+
  
 
 
@@ -293,17 +343,3 @@ function routine_overall()
 
 
 end
-
-
-
-
-
-
-
-
-
-
-
-
-
-
