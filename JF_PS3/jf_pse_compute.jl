@@ -1,5 +1,13 @@
-using Parameters, DataFrames, StatFiles, Random, Distributions, Optim, LinearAlgebra, Plots
+using Parameters, DataFrames, StatFiles, Random, Distributions, Optim, LinearAlgebra, Plots, LogExpFunctions
+
+
+
+
+
+
+
 cd("C:/Users/mcket/OneDrive/Documents/Fall 2022/ECON899-Computational/899Code/JF_PS3")
+
 
 ind_characteristics = DataFrame(load("C:/Users/mcket/OneDrive/Documents/Fall 2022/ECON899-Computational/899Code/JF_PS3/PS3/Simulated_type_distribution.dta"))
 car_ch = DataFrame(load("C:/Users/mcket/OneDrive/Documents/Fall 2022/ECON899-Computational/899Code/JF_PS3/PS3/Car_demand_characteristics_spec1.dta"))
