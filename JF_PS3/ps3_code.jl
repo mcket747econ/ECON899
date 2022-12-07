@@ -31,7 +31,7 @@ iv_specification = DataFrame(load("C:/Users/mcket/OneDrive/Documents/Fall 2022/E
 
 end
 
-@with_kw mutable struct Results
+@with_kw mutable struct Results  ##Include elements that will change over the course of the iterations
     produc_t = Array{Array{Float64,1},1}()
     delta_iia::Array{Float64,1} 
     #res_norm::Array{Float64,1} 
@@ -44,7 +44,7 @@ end
 end 
 
 
-function Initialize()
+function Initialize() #Initialize parameter struct and results struct
     P = Param()
     produc_t = Array{Array{Float64,1},1}()
     delta_iia = Vector(car_ch[:,"delta_iia"]) ##the iia delta values
@@ -54,34 +54,10 @@ function Initialize()
 end 
 
 P,R = Initialize()
-# R.produc_t
-# price_vector = zeros(6103,31 )
-# z = zeros(31,1)
-# share_ch = Vector(car_ch[:,"share"])
 
-# carch_ch_mt = Matrix(car_ch)
-# mz = Vector(car_ch[:,"price"])
-# mz1 = Vector(car_ch[:,"price"])
 
-# mz_test = Array{Float64,2}
-# mz_test = zeros(6103,2)
-# mz_test[:,1] = mz1
-# mz_test[:,2] = x
-# prices = car_p[xyz1]
 
-Random.seed!(1234)
-x = rand(Uniform(10,20),6103)
-# xyz = getindex(carch_ch_mt[:,2],1997)
-# xyz1 = findall(x->x==1985,carch_ch_mt[:,2])
-# xyz2 = findall(x->x==1985,carch_ch_mt[:,2])
-# xyz3 = findall(x->x==1985,carch_ch_mt[:,2])
-
-# xy = [xyz1,xyz2,xyz3]
-# xy[1]
-# years = unique(car_ch[:,"Year"])
-
-# Creating a product_id_code
-function precompute(carch_ch_mt,years,produc_t)
+function precompute(carch_ch_mt,years,produc_t)  ##Precompute the productids for each particular year
     produc_1 = 0
     for i = 1:31
         produc_1 = findall(x->x==years[i],carch_ch_mt[:,2])
@@ -90,16 +66,9 @@ function precompute(carch_ch_mt,years,produc_t)
     end
     return produc_t
 end
-# produc_t = Array{Array{Float64,1},1}()
-# produc_t = precompute(carch_ch_mt,P.years,produc_t)
 
 
-# xy = Array{Float64,2}
-# xyz = Array{Float64,3}
-# xyz = zeros()
-# xyz[:,:,1] = xy
-
-function individual_char(P::Param, produc_t)
+function individual_char(P::Param, produc_t)  
     Zf = Array{Array{Float64,2},1}() ##Structure that will contain all the prices associated with products in a particular market(Year)
     Z = zeros(P.T,1)
     for i=1:P.T
@@ -113,50 +82,7 @@ function individual_char(P::Param, produc_t)
     return Zf
 end
 
-# Zf = individual_char(P,produc_t)
-# A[1] = Matrix{Float64}
-# typeof(A[:,1])  
-# typeof(Z_test)
-# A[:,:,1] = Z_test
-# Z_test = individual_char()
-# Z = individual_char()
-# Z_fin = Matrix{Float64}
-# Z_again = hcat(Z, Z_test)
-# Z_fin = zeros(31,2)
-# xy =[Z Z_test]
-# Z_fin[:,1] = Z_test
-# A = [f(a[i], b[j]) for i = 1:2, j = 1:3]
-# 2×3 Matrix{Int64}:
-# produc_t = precompute(carch_ch_mt,years,produc_t)
-# prices = mz[Int64.(produc_t[1])]
-# mz = Matrix()
-# Array{Matrix{Float64},1}()
-# produc_t = Array{Array{Float64,1},1}()
-# xyz1 = zeros(Array{Float64,1},(31,1))
-# produc_t[1]
 
-# a = [1,2]
-# push!(produc_t,[1.0,2.0,3.0])
-
-# function make_price()
-#     price_vec = zeros(6103,31)
-#     for  i = 1:31
-#         for j = 1:1
-#             z[i, j] = mz[aProductID[i],j].*ind_characteristics'
-#             price_vec[i,j] = car_ch[(car_ch[:,"Model_id"].==i).&(car_ch[:,"Year"].==j),:][:,"price"]
-#         end
-
-#     end
-#     return price_vec
-# end
-
-# simdist'
-
-
-
-# price_vector = make_price()
-
-# mz = car_ch[:,"price"]
 
 function value(lambda,t,Z)   ##Evaluating the value of individual characteristics,and prices u
     mu = Array{Float64,2}
@@ -166,22 +92,9 @@ function value(lambda,t,Z)   ##Evaluating the value of individual characteristic
     return mu_exp
 end
 
-# mu = value(P.lambda,1,Zf)
-# Int64.(produc_t[1])
-# R.delta_iia[327]
-# R.delta_iia[Int64.(produc_t[1])]
-# ev = exp.(R.delta_iia[Int64.(produc_t[1])])#.*mu
-# ev./(1 .+ ev)
-# test = exp.(delta_iia[Int64.(produc_t[1])]).*value(0.6,1)
-# ms = test./(1 .+ sum_cols)
-# sum_cols = sum(test,dims=1)
-# mean(ms, dims=2)
-# mat2 = ms*ms'./100
-# ms.*(1 .- ms)
-# Diagonal(mean(ms.*(1 .- ms),))
-
 function demand(mu,t,delta,produc_t) ##Creating the Demand Function
     ev = exp.(delta[Int64.(produc_t[t])]).*mu
+    #ev = exp.(delta[Int64.(produc_t[t])] .- logsumexp.(delta[Int64.(produc_t[t])])).*mu
     market_share = ev./(1 .+ ev)
     #println("market share is ", market_share)
     shat = mean(market_share,dims=2)
@@ -189,11 +102,13 @@ function demand(mu,t,delta,produc_t) ##Creating the Demand Function
 
 end
 
+
 function jacobian(ms)
 
     square = ms*(1 .- ms)'
-    mat2 = ms*ms'./100
-    jacob = square./100 *I .-  (mat2 - mat2*I)/100
+    mat2 = ms*ms'#./100
+    sz = size(mat2)
+    jacob = mean.(eachcol(square)) .- (1/100).*mat2 + Diagonal(zeros(size(mat2)))  #(1/100).*(1 - I).*mat2
     return jacob
 end
 
@@ -203,16 +118,17 @@ end
 
 function inverse(P::Param,R::Results,eps0,eps1,share_ch,T_thisrun,shat,delta_iia,mu,produc_t,Z)
     for t = 1:T_thisrun
-        value(P.lambda,t,Z)
+        value(P.lambda,t,Z) ##Calci
         rowid = produc_t[t]
         f = 100
         res_norm::Array{Float64,1} = [0]
         i = 1
         jacob = Matrix{Float64}
-        while norm(f) > eps1
+        while norm(f) > eps1   ##While loop for when norm is greater than 1
             #jacob = 0
+            #println("norm f:", norm(f))
             ms, shat= demand(mu,T_thisrun,delta_iia,produc_t)
-            println(i)
+            #println(i)
             #println("shat is",shat)
             jacob = jacobian(ms)
             # println(P.share_ch[Int64.(rowid)])
@@ -221,28 +137,42 @@ function inverse(P::Param,R::Results,eps0,eps1,share_ch,T_thisrun,shat,delta_iia
             f = log.(P.share_ch[Int64.(rowid)]) .- log.(shat)
             # print(f)
             R.delta_iia[Int64.(rowid)] = R.delta_iia[Int64.(rowid)] .+ f
-            println(norm(f))
+            println("This is R Delta", R.delta_iia[Int64.(rowid)])
+            #println(norm(f))
             append!(res_norm,norm(f))
-            print("res norm really is ", res_norm)
+            #print("res norm really is ", res_norm)
             i += 1
         end 
 
-        while norm(f) > eps0
+        while norm(f) > eps0  ##While loop for when norm is less than 1 but above 10e-12
             #jacobian = 1
+            println("norm f:", norm(f))
+           #println("this is delt ", delta_iia[Int64.(produc_t[T_thisrun])])  
+            ev = (delta_iia[Int64.(produc_t[T_thisrun])]).*mu  
+           # println("this is delt ", delta_iia[Int64.(produc_t[T_thisrun])])  
+            # println("this is ev ", ev)   
+            # println("share is", (ev)./(1 .+ ev))
+            # println("market share is", mean((ev)./(1 .+ ev),dims=2))
             ms,shat = demand(mu,T_thisrun,delta_iia,produc_t)
-            println("shat2 is ", shat)
-            f = log.(P.share_ch[Int64.(rowid)])-log.(shat)
+            #  ms = (ev)./(1 .+ ev)
+            #  shat = mean((ev)./(1 .+ ev),dims=2)
+            # println("market share2 is", ms)
+           #  println("this is ms ", ms)   
+            # println("shat2 is ", shat)
+            f = log.(P.share_ch[Int64.(rowid)]).-log.(shat)
             jacob = jacobian(ms)
-            println(" Why is this Na ", R.delta_iia[Int64.(rowid)])
-            println(" Why is this f Na ", f)
-            R.delta_iia[Int64.(rowid)] = R.delta_iia[Int64.(rowid)] .+ inv(jacob./shat)*f
+            # println(" Why is this Na ", R.delta_iia[Int64.(rowid)])
+            # println(" Why is this f Na ", f)
+            #println(jacob./shat)
+            R.delta_iia[Int64.(rowid)] = R.delta_iia[Int64.(rowid)]  + inv(jacob./shat)*f
+            println("This is R Delta", R.delta_iia[Int64.(rowid)])
             #println(norm(f))
             append!(res_norm,norm(f))  
-            println("res norm really really is ", res_norm)                         
+            #println("res norm really really is ", res_norm)    
         end     
         return res_norm   
     end
-    println("res norm is ", res_norm)
+    #println("res norm is ", res_norm)
     return res_norm
 end 
 
@@ -255,7 +185,7 @@ end
 
 
 
-function routine_overall(P::Param,R::Results,t)
+function routine_overall(P::Param,R::Results,t)  ##Overall code function
     P, R = Initialize()
     res_norm::Array{Float64,1} = [0]
     produc_t = Array{Array{Float64,1},1}()
@@ -266,14 +196,24 @@ function routine_overall(P::Param,R::Results,t)
     Zf = individual_char(P,produc_t)
     mu =value(P.lambda,t,Zf)
     market_share,shat  = demand(mu,t,R.delta_iia,produc_t)
-    println("shat is ", shat)
+    #println("shat is ", shat)
     jacob = jacobian(market_share)
     #print(jacob)
     res_norm_init = inverse(P,R,P.eps0,P.eps1, P.share_ch,t,shat,R.delta_iia,mu,produc_t,Zf)
    #print(res_norm_init)
-   println("res norm init ", res_norm_init)
-    return res_norm_init
+   #println("res norm init ", res_norm_init)
+    return res_norm_init  ##return vector of norms
 end
+
+
+
+
+# res_norm_init = inverse(P,R,P.eps0,P.eps1, P.share_ch,t,shat,R.delta_iia,mu,produc_t,Zf)
+
+
+
+
+
 
 
 
