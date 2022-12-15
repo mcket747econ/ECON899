@@ -1,7 +1,7 @@
-using Parameters, DataFrames, StatFiles, Random, Distributions, Optim, LinearAlgebra, Plots, LogExpFunctions, Distributed
+using Parameters, DataFrames, StatFiles, Random, Distributions, Optim, LinearAlgebra, Plots, LogExpFunctions, CSV
 
 #cd("C:/Users/mcket/OneDrive/Documents/Fall 2022/ECON899-Computational/899Code/JF_PS3")
-#cd("/Users/jacobbills/Desktop/Economics/Econ 899/JF 3/")
+cd("/Users/jacobbills/Desktop/Economics/Econ 899/JF 3/")
 
 ind_characteristics = DataFrame(load("./Simulated_type_distribution.dta"))
 car_ch = DataFrame(load("./Car_demand_characteristics_spec1.dta"))
@@ -38,3 +38,9 @@ first_l, second_l = two_step(P,R,min_lam,31)
 
 println("The λ found in the first step is: ", first_l)
 println("The λ found in the second step is: ", second_l)
+
+
+##Results printouts 
+CSV.write("q1_results.csv", DataFrame([res_norm],[:col1]))
+mat = hcat(Array(grid_lam),gm_grid)
+CSV.write("q2_gridsearch.csv",DataFrame(mat,:auto))
