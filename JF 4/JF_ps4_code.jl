@@ -81,7 +81,7 @@ function payoff(P::params, R::results,a,i,c,p)
 end
 
 
-function value_func(P::params, R::results,i,c,p,S)
+function value_func(P::params, R::results,S)
     val_func = zeros(P.ni,P.nc,P.np)
     val_0 = 0
     val_1 = 0
@@ -126,7 +126,32 @@ function value_func(P::params, R::results,i,c,p,S)
 end
 
 #R.val_func,R.val_func_0, R.val_func_1 = value_func(P,R,S[:,"I"],S[:,"C"],S[:,"P"],S)
-R.val_func,R.val_func_0,R.val_func_1 = value_func(P,R,S[:,"I"],S[:,"C"],S[:,"P"],S)
+R.val_func,R.val_func_0,R.val_func_1 = value_func(P,R,S)
+
+function overall_iteration(P::params,R::results,S,tol::Float64=1e-5)
+    new_val_func = zeros(P.ni,P.nc,P.np)
+    val0 = zeros(P.ni,P.nc,P.np)
+    val1 = zeros(P.ni,P.nc,P.np)
+    error = 100
+    n = 1
+    while error > tol
+        n+=1
+        new_val_func,val0,val1 = value_func(P,R,S)
+        println("error ", maximum(abs.(new_val_func - R.val_func)))
+        println("error ", error)
+        error = maximum(abs.(new_val_func - R.val_func))
+        R.val_func = new_val_func
+        R.val_func_0 = val0
+        R.val_func_1 = val1
+        println("Iteration ", n)
+        
+    end
+    println("Value functions converged in ", n, " iterations.")
+end
+
+overall_iteration(P,R,S)
+
+
 
 function expected_val_func(P::params,R::results)
     exp_val_func = zeros(P.ni,P.nc,P.np)
@@ -148,6 +173,7 @@ function expected_val_func(P::params,R::results)
 end
 
 R.exp_val_func = expected_val_func(P,R)
+
 
 
 
