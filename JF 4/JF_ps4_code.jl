@@ -1,5 +1,3 @@
-#using Pkg;Pkg.add("CSV") Load csv package in order to be able to load csv files
-
 using DataFrames, Random, Parameters, Distributions, Accessors, CSV
 
 S = DataFrame(CSV.File("C:/Users/mcket/OneDrive/Documents/Fall 2022/ECON899-Computational/899Code/JF_PS4/PS4/PS4_state_space.csv"))
@@ -50,7 +48,8 @@ end
 
 
 
-end 
+end
+
 
 function initialize(S)
     P = params()
@@ -176,5 +175,30 @@ R.exp_val_func = expected_val_func(P,R)
 
 
 
+function CCP_mapping(P::params,R::results)  #CCP Mapping 
+    F = (1-P).*F_0 .+ P.*F_1
+    V_barp = (I .- P.beta*.*F) 
 
+    
+    
+
+
+
+end
+
+
+function CCP(P::params,R::results)
+    p_hat = zeros(36)
+    stat_id = unique(sim_data[:,"state_id"])
+    length_stat = length(stat_id)
+    for stat in 1:length_stat
+       numb_in_state = size(sim_data[sim_data.state_id.==stat_id[stat],:])[1]
+        #for row in length(sim_data[sim_data.state_id.==stat,"choice"])
+        p_hat[stat] = size(sim_data[(sim_data.state_id.==stat_id[stat]).&& (sim_data.choice.==1),:])[1]/numb_in_state
+    end 
+
+    return p_hat
+end 
+
+p_hat = CCP(P,R)      ###How the heck do I constrain these values?
 
