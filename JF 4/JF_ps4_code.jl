@@ -1,6 +1,6 @@
 #using Pkg;Pkg.add("CSV") Load csv package in order to be able to load csv files
 
-using DataFrames, Random, Parameters, Distributions, Accessors, CSV, LinearAlgebra
+# using DataFrames, Random, Parameters, Distributions, Accessors, CSV, LinearAlgebra
 
 S = DataFrame(CSV.File("C:/Users/mcket/OneDrive/Documents/Fall 2022/ECON899-Computational/899Code/JF_PS4/PS4/PS4_state_space.csv"))
 F_a00 = DataFrame(CSV.File("C:/Users/mcket/OneDrive/Documents/Fall 2022/ECON899-Computational/899Code/JF_PS4/PS4/PS4_transition_a0.csv"))
@@ -41,6 +41,7 @@ end
 
 @with_kw mutable struct results
     exp_val_func::Array{Float64,3}
+    exp_val_vector::Array{Float64,1}
     exp_val_func_ccp::Array{Float64,1}
     val_func_0::Array{Float64,3}
     val_func_1::Array{Float64,3}
@@ -64,15 +65,16 @@ end
 function initialize(S)
     P = params()
     exp_val_func = zeros(size(S)[1],size(S)[1],size(S)[1])
+    exp_val_vector = zeros(P.ns)
     exp_val_func_ccp = zeros(size(S)[1])
     val_func_0 = zeros(P.ni,P.nc,P.np)
     val_func_1 = zeros(P.ni,P.nc,P.np)
     val_func = zeros(P.ni,P.nc,P.np)
     val_func_ccp = zeros(P.ns)
-    p_hat = zeros(P.ns)
+    p_hat = fill(0.5,P.ns)
 
 
-    R = results(exp_val_func,exp_val_func_ccp,val_func_0,val_func_1,val_func,val_func_ccp,p_hat)
+    R = results(exp_val_func,exp_val_vector,exp_val_func_ccp,val_func_0,val_func_1,val_func,val_func_ccp,p_hat)
     return P, R
 end
 P,R = initialize(S)
@@ -141,7 +143,7 @@ function value_func(P::params, R::results,S)
      return val_func,val0,val1   #Return the value function and the choice specific value functions                                                                              
 end
 
-#R.val_func,R.val_func_0, R.val_func_1 = value_func(P,R,S[:,"I"],S[:,"C"],S[:,"P"],S)
+
 R.val_func,R.val_func_0,R.val_func_1 = value_func(P,R,S) #Assign value functions to their arrays in the results struct
 
 function overall_iteration(P::params,R::results,S,tol::Float64=1e-5) ##This conducts our iteration in order to converge to the correct value
@@ -164,12 +166,13 @@ function overall_iteration(P::params,R::results,S,tol::Float64=1e-5) ##This cond
     ##println("Value functions converged in ", n, " iterations.")
 end
 
-overall_iteration(P,R,S)
 
 
 
 function expected_val_func(P::params,R::results)     ##Calculating the expected value function by weighting between the choice specific value functions
     exp_val_func = zeros(P.ni,P.nc,P.np)
+    exp_val_vector = zeros(P.ns)
+
     val_func_0 = R.val_func_0
     val_func_1 = R.val_func_1
     v_tilde = R.val_func_1 .- val_func_0  ##Per the formula, subtract val0 from val1 to yield val tilde
@@ -181,13 +184,17 @@ function expected_val_func(P::params,R::results)     ##Calculating the expected 
     e_0 = P.gamma .- log.(p_0s)
     e_1 = P.gamma .- log.(p_1s)
     exp_val_func .= p_0s.*(val_func_0 .+ e_0) + p_1s.*(val_func_1 .+ e_1)
+    #exp_val_func = log()
+    exp_val_vector[1:9] = exp_val_func[:,1,1]
+    exp_val_vector[10:18] = exp_val_func[:,2,1]
+    exp_val_vector[19:27] = exp_val_func[:,1,2]
+    exp_val_vector[28:36] = exp_val_func[:,2,2]
 
 
 
-    return exp_val_func
+    return exp_val_func,exp_val_vector
 end
 
-R.exp_val_func = expected_val_func(P,R) 
 function CCP(P::params,R::results)
     p_hat = zeros(P.ns)
     stat_id = unique(sim_data[:,"state_id"]) #Get a vector of the unique values of state_id column. Aka, get all unique state_ids. 
@@ -198,7 +205,9 @@ function CCP(P::params,R::results)
        numb_in_state = size(sim_data[sim_data.state_id.==stat_id[stat],:])[1]
        #get the number of rows where the the state is the curent valuer of stat_id
         #for row in length(sim_data[sim_data.state_id.==stat,"choice"])
-        p_hat[stat] = size(sim_data[(sim_data.state_id.==stat_id[stat]).&& (sim_data.choice.==1),:])[1]/numb_in_state
+        number_restocking = size(sim_data[(sim_data.state_id.==stat_id[stat]).&& (sim_data.choice.==1),:])[1]
+        p_hat[stat] = number_restocking/numb_in_state
+        println(p_hat[stat], stat)
         #numerator: the size of the subset of the simulation matrix where the state is the curent value of stat_id and 
         #the value of the choice column is 1(i.e., where the state is state_id[stat] and the individual chooses to restock)
         #denominator: the number of values that are in the state stat_id[stat]
@@ -215,6 +224,7 @@ function CCP(P::params,R::results)
 
     return p_hat
 end 
+
 function payoff_ccp(P::params, R::results,S)
     val_func = zeros(P.ni,P.nc,P.np)
     val_0 = 0
@@ -264,29 +274,8 @@ function payoff_ccp(P::params, R::results,S)
      return val_func,val0,val1   #Return the value function and the choice specific value functions                                                                              
 end
 
-
-
-
-function CCP_mapping(P::params,R::results)  #CCP Mapping 
-    F = (1-P).*F_0 .+ P.*F_1
-    V_barp = (I .- P.beta.*F) 
-    val_func_0 = R.val_func_0
-    val_func_1 = R.val_func_1
-
-
-    
-
-
-    
-    
-
-    V_barp = (I .- P.beta.*F).*((1-R.p_hat)*payoff(P,R,0,S[ind,"I"],S[ind,"C"],S[ind,"P"])
-    +(R.phat)*payoff(P,R,1,S[ind,"I"],S[ind,"C"],S[ind,"P"]))
-
-end
-
-function vbar_ccp(P::params,R::results,S)
-    p_hat = CCP(P,R)
+function vbar_ccp(P::params,R::results,S,p_hat)
+    #p_hat = CCP(P,R)
     payoff, payoff_0, payoff_1 = payoff_ccp(P,R,S)
     F = (F_a0).*(1 .- p_hat) .+ (F_a1).*(p_hat)
     F = Matrix(F)
@@ -314,12 +303,11 @@ function vbar_ccp(P::params,R::results,S)
 
 
 
-    return V_barp,payoff_0, payoff_1, F
+    return V_barp,payoff_0,payoff_1,F
 end 
 
-t1,x,y,z = vbar_ccp(P,R,S)
-typeof(z)
-function overall_ccp_iteration(P::params, R::results, tol::Float64 = 1e-3)
+
+function overall_ccp_iteration(P::params, R::results, tol::Float64 = 10^(-10))
     exp_val_func_ccp = zeros(P.ni,P.nc,P.np)
     payoff_0 = zeros(P.ns)
     payoff_1 = zeros(P.ns)
@@ -331,14 +319,16 @@ function overall_ccp_iteration(P::params, R::results, tol::Float64 = 1e-3)
     n = 1
     while error > tol   ##Set our threshold 
         n+=1 #Counter
-        exp_val_func_ccp,payoff_0, payoff_1, F = vbar_ccp(P,R,S) #Run our value function 
+        exp_val_func_ccp,payoff_0, payoff_1, F = vbar_ccp(P,R,S,R.p_hat) #Run our value function 
         ##println("error ", maximum(abs.(new_val_func_ccp - R.val_func_ccp))) #Print the eror result to keep track of what is happening
         #println("F_a1",F_a1)
 
-        v_tilde_ccp = (P.beta*(F_a1*exp_val_func_ccp) .+ ((payoff_1))) .- ((payoff_0) .+ P.beta*(F_a0*exp_val_func_ccp))
+        #v_tilde_ccp = (P.beta*(F_a1*exp_val_func_ccp) .+ ((payoff_1))) .- ((payoff_0) .+ P.beta*(F_a0*exp_val_func_ccp))
         #println("v_tilde_ccp ",v_tilde_ccp)
-        new_phat = (1 .+ exp.((-1)*v_tilde_ccp))
-        new_phat = Array(new_phat)
+        #new_phat = (1 .+ exp.((-1)*v_tilde_ccp))
+        new_phat = (P.beta*(F_a1*exp_val_func_ccp) .+ ((payoff_1)))./((P.beta*(F_a1*exp_val_func_ccp) .+ ((payoff_1))) .+ ((payoff_0) .+ P.beta*(F_a0*exp_val_func_ccp)))
+        println(new_phat)
+        #new_phat = Array(new_phat)
      #   #println(new_phat)
         ##println('size_phat', size(new_phat))
         ##println("error ", maximum(abs.(new_phat - R.p_hat))) #Print the eror result to keep track of what is happening
@@ -358,12 +348,4 @@ function overall_ccp_iteration(P::params, R::results, tol::Float64 = 1e-3)
 
 end
 
-overall_ccp_iteration(P,R)
-
-
-p_hat = CCP(P,R)      ###How the heck do I constrain these values?
-
-
-
-x,y,z = payoff_ccp(P,R,S)
 
