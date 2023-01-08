@@ -340,8 +340,10 @@ function overall_ccp_iteration(P::params, R::results, tol::Float64 = 10^(-10))
         #new_phat = (1 .+ exp.((-1)*v_tilde_ccp))
         exp_val_func_ccp,payoff_0, payoff_1, F = vbar_ccp(P,R,S,R.p_hat) #Run our value function 
 
-        new_phat = (P.beta*(F_a1*exp_val_func_ccp) .+ ((payoff_1)))./((P.beta*(F_a1*exp_val_func_ccp) .+ ((payoff_1))) .+ ((payoff_0) .+ P.beta*(F_a0*exp_val_func_ccp)))
-        new_phat = [if new_phat[x] > 0 && new_phat[x] < 1 new_phat[x] elseif new_phat[x] >= 1 .999 else .001 end for x=1:36] #constraining the frequency
+        #new_phat = (P.beta*(F_a1*exp_val_func_ccp) .+ ((payoff_1)))./((P.beta*(F_a1*exp_val_func_ccp) .+ ((payoff_1))) .+ ((payoff_0) .+ P.beta*(F_a0*exp_val_func_ccp)))
+        new_phat = 1 ./(1 .+exp.(-((P.beta*(F_a1*exp_val_func_ccp) .+ ((payoff_1))) .-(P.beta*(F_a0*exp_val_func_ccp) .+ ((payoff_0))))))
+        
+        new_phat = [if new_phat[x] >= 0.001 && new_phat[x] <= .999 new_phat[x] elseif new_phat[x] > .999 .999 else .001 end for x=1:36] #constraining the frequency
         # mat_test = [payoff_0 payoff_1]
         # exp_test = exp.(mat_test)
         # sumr = sum(exp_test,dims=2)
@@ -368,6 +370,8 @@ function overall_ccp_iteration(P::params, R::results, tol::Float64 = 10^(-10))
    println("Value functions converged in ", n, " iterations.")
    return R.p_hat
 end
+
+
 
 function inner(P::params, R::results,tol1::Float64= 10e-2,tol2::Float64=10e-10)
     overall_iteration(P,R,S,tol1)
