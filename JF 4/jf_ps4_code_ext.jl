@@ -78,7 +78,7 @@ function payoff(P::params, R::results,a,i,c,p)  ##Per Period Payoff Function
         end
     elseif a == 0 && i > 0 #Payoff if we don't restock and our inventory is non zero
         payoff = P.alpha*c   
-    else                    #If we choose to restock
+    elseif a == 1                    #If we choose to restock        
         payoff = P.alpha*c - p  #Payoff when choosing to restock 
     end
     return payoff 
@@ -94,15 +94,17 @@ function value_func(P::params, R::results,S)
     #val =  zeros(size(S)[1],size(S)[1],size(S)[1])                                                                                        
     for ind = 1:size(S)[1] ##Iterate over the index of each state row
         for a = 0:1 ##For each potential asset choice
-            v = P.alpha*S[ind,"C"] - S[ind,"P"] 
+            #v = P.alpha*S[ind,"C"] - S[ind,"P"] 
        #     #println(S[ind,"I"] + a - S[ind,"C"])
             #i_p = minimum(P.i_bar,(S[ind,"I"] + a - S[ind,"C"])),,,,,,,,,,,,,,,,,
             # Conditions for the investment value next period i_p
-            if S[ind,"I"] + a - S[ind,"C"] > P.i_bar ##
-                i_p = P.i_bar ##i_p = i_bar if the amount of investment this period plus the restock decision minus the consumption decision is greater than i_bar
-            else
-                i_p = S[ind,"I"] + a - S[ind,"C"] 
-            end 
+            # if S[ind,"I"] + a - S[ind,"C"] > P.i_bar ##
+            #     i_p = P.i_bar ##i_p = i_bar if the amount of investment this period plus the restock decision minus the consumption decision is greater than i_bar
+            # else
+            #     i_p = S[ind,"I"] + a - S[ind,"C"] 
+            # end 
+
+            i_p = minimum([S[ind,"I"] + a - S[ind,"C"],P.i_bar])
 
             if a == 0  ##If we choose not to restock
                 val_0 = payoff(P,R,a,S[ind,"I"],S[ind,"C"],S[ind,"P"])  ##Choice specific value function equals 
@@ -113,9 +115,9 @@ function value_func(P::params, R::results,S)
                  #R.val_func[i_p,1/2,.9*P.P_r +.1*P.P_s] = payoff(P,R,a,i_p,S[ind,"C"],S[ind,"P"]) + P.beta*0.5*(val_func[i_p,0,P.pr]*0.9 + val_func[i_p,0,P.ps]*0.1) + P.beta*0.5*(val_func[i_p,1,P.pr]*0.9 + val_func[i_p,1,P.ps]*0.1)
                 val0[findall(x->x==S[ind,"I"],P.i),findall(x->x==S[ind,"C"],P.c),findall(x->x==S[ind,"P"],P.p)] .= val_0 #Set choice 0 specific value function
                 #at a level of investment, consumption and price from this particular loop equal to val_0
-            else a == 1
+            else 
                 val_1 = payoff(P,R,a,S[ind,"I"],S[ind,"C"],S[ind,"P"]) 
-                + P.beta*0.5*((val_func[findall(x->x==i_p,P.i),findall(x->x==0,P.c),findall(x->x==4,P.p)])*0.9 + (val_func[findall(x->x==i_p,P.i),findall(x->x==0,P.c),findall(x->x==1,P.p)])*0.1) +
+                + P.beta*0.5*((val_func[findall(x->x==i_p,P.i),findall(x->x==0,P.c),findall(x->x==4,P.p)])*0.9 + (val_func[findall(x->x==i_p,P.i),findall(x->x==0,P.c),findall(x->x==1,P.p)])*0.1) 
                 + P.beta*0.5*((val_func[findall(x->x==i_p,P.i),findall(x->x==1,P.c),findall(x->x==4,P.p)])*0.9 + (val_func[findall(x->x==i_p,P.i),findall(x->x==1,P.c),findall(x->x==1,P.p)])*0.1)
                 val1[findall(x->x==S[ind,"I"],P.i),findall(x->x==S[ind,"C"],P.c),findall(x->x==S[ind,"P"],P.p)] .= val_1
 
@@ -134,7 +136,7 @@ function value_func(P::params, R::results,S)
 end
 
 
-R.val_func,R.val_func_0,R.val_func_1 = value_func(P,R,S) #Assign value functions to their arrays in the results struct
+#R.val_func,R.val_func_0,R.val_func_1 = value_func(P,R,S) #Assign value functions to their arrays in the results struct
 
 function overall_iteration(P::params,R::results,S,tol::Float64=1e-5) ##This conducts our iteration in order to converge to the correct value
     new_val_func = zeros(P.ni,P.nc,P.np)
@@ -299,6 +301,7 @@ end
 
 function overall_ccp_iteration(P::params, R::results, tol::Float64 = 10^(-10))
     exp_val_func_ccp = zeros(P.ni,P.nc,P.np)
+    v_bar_new = zeros(P.ni,P.nc,P.np)
     payoff_0 = zeros(P.ns)
     payoff_1 = zeros(P.ns)
     new_phat = zeros(P.ns)
@@ -306,18 +309,44 @@ function overall_ccp_iteration(P::params, R::results, tol::Float64 = 10^(-10))
     v_tilde_ccp = zeros(P.ns)
     #payoff, payoff_0, payoff_1 = payoff_ccp(P,R)
     error = 100
+    error2 = 100
     n = 1
-    while n<=100 && error > tol   ##Set our threshold 
+    coef = fill(1/36,36)
+    while error > 10^(-2)   ##Set our threshold 
         n+=1 #Counter
+       
         exp_val_func_ccp,payoff_0, payoff_1, F = vbar_ccp(P,R,S,R.p_hat) #Run our value function 
+        error =norm(exp_val_func_ccp .- R.exp_val_func_ccp)
+        R.exp_val_func_ccp = exp_val_func_ccp
+        # mf = F_a0.*R.p_hat+ F_a1.*(R.p_hat)
+        # new_coef = mf'coef
+        # error = norm(new_coef .- coef)
+        # coef = new_coef
+        # println(size(mf))    
+        # #  R.exp_val_func_ccp .= v_bar_new
+        # for i = 1:36
+        #     R.exp_val_func_ccp[i] = mf[i,i]
+        # end
+        
+    end
+
+    while error2 > tol .&& n < 100
+        n+=1
         ##println("error ", maximum(abs.(new_val_func_ccp - R.val_func_ccp))) #Print the eror result to keep track of what is happening
         #println("F_a1",F_a1)
 
         #v_tilde_ccp = (P.beta*(F_a1*exp_val_func_ccp) .+ ((payoff_1))) .- ((payoff_0) .+ P.beta*(F_a0*exp_val_func_ccp))
         #println("v_tilde_ccp ",v_tilde_ccp)
         #new_phat = (1 .+ exp.((-1)*v_tilde_ccp))
+        exp_val_func_ccp,payoff_0, payoff_1, F = vbar_ccp(P,R,S,R.p_hat) #Run our value function 
+
         new_phat = (P.beta*(F_a1*exp_val_func_ccp) .+ ((payoff_1)))./((P.beta*(F_a1*exp_val_func_ccp) .+ ((payoff_1))) .+ ((payoff_0) .+ P.beta*(F_a0*exp_val_func_ccp)))
-        new_phat = [if new_phat[x] > 0 && new_phat[x] < 1 new_phat[x] elseif new_phat[x] >= 1 .999 else .001 end for x=1:36] #constraining the frequency estimator
+        new_phat = [if new_phat[x] > 0 && new_phat[x] < 1 new_phat[x] elseif new_phat[x] >= 1 .999 else .001 end for x=1:36] #constraining the frequency
+        # mat_test = [payoff_0 payoff_1]
+        # exp_test = exp.(mat_test)
+        # sumr = sum(exp_test,dims=2)
+        # new_phat = exp.(mat_test[:,2])./sumr
+
         #println(new_phat)
         #new_phat = Array(new_phat)
      #   #println(new_phat)
@@ -325,18 +354,19 @@ function overall_ccp_iteration(P::params, R::results, tol::Float64 = 10^(-10))
         ##println("error ", maximum(abs.(new_phat - R.p_hat))) #Print the eror result to keep track of what is happening
       #  #println(new_phat)
        # error = maximum(abs.(new_phat .- R.p_hat))
-       error = norm(new_phat .- R.p_hat)
-       #println(error)
+        error2 = norm( R.p_hat .- new_phat)
+        #error2 = norm(new_phat .- R.p_hat) 
+        #println(error2)
         #println(size(new_phat))
         ##println(new_phat)
-        R.p_hat = new_phat
-        R.exp_val_func_ccp = exp_val_func_ccp
+        R.p_hat .= new_phat
+        #R.exp_val_func_ccp = exp_val_func_ccp
 
         #println("Iteration ", n) #Print the iteration value to keep track of what is happening
         
     end
    println("Value functions converged in ", n, " iterations.")
-    return R.p_hat
+   return R.p_hat
 end
 
 function inner(P::params, R::results,tol1::Float64= 10e-2,tol2::Float64=10e-10)
