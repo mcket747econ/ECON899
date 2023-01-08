@@ -14,3 +14,5 @@ R.exp_val_func_ccp,payoff_0,payoff_1,F = vbar_ccp(P,R,S,sim_phat)
 
 overall_ccp_iteration(P,R)
 R.exp_val_func_ccp
+
+S
