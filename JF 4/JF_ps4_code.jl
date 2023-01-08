@@ -1,6 +1,8 @@
 #using Pkg;Pkg.add("CSV") Load csv package in order to be able to load csv files
 
-# using DataFrames, Random, Parameters, Distributions, Accessors, CSV, LinearAlgebra
+
+#using DataFrames, Random, Parameters, Distributions, Accessors, CSV, LinearAlgebra
+
 
 S = DataFrame(CSV.File("C:/Users/mcket/OneDrive/Documents/Fall 2022/ECON899-Computational/899Code/JF_PS4/PS4/PS4_state_space.csv"))
 F_a00 = DataFrame(CSV.File("C:/Users/mcket/OneDrive/Documents/Fall 2022/ECON899-Computational/899Code/JF_PS4/PS4/PS4_transition_a0.csv"))
@@ -79,6 +81,7 @@ function initialize(S)
 end
 P,R = initialize(S)
 
+
 function payoff(P::params, R::results,a,i,c,p)  ##Per Period Payoff Function 
     if a == 0 && i ==0   ##Payoff if don't restock and no inventory
         if c > 0   ##Positive consumption shock
@@ -88,7 +91,7 @@ function payoff(P::params, R::results,a,i,c,p)  ##Per Period Payoff Function
         end
     elseif a == 0 && i > 0 #Payoff if we don't restock and our inventory is non zero
         payoff = P.alpha*c   
-    else                    #If we choose to restock
+    elseif a == 1                    #If we choose to restock
         payoff = P.alpha*c - p  #Payoff when choosing to restock 
     end
     return payoff 
@@ -104,15 +107,17 @@ function value_func(P::params, R::results,S)
     #val =  zeros(size(S)[1],size(S)[1],size(S)[1])                                                                                        
     for ind = 1:size(S)[1] ##Iterate over the index of each state row
         for a = 0:1 ##For each potential asset choice
-            v = P.alpha*S[ind,"C"] - S[ind,"P"] 
+            #v = P.alpha*S[ind,"C"] - S[ind,"P"] 
        #     #println(S[ind,"I"] + a - S[ind,"C"])
             #i_p = minimum(P.i_bar,(S[ind,"I"] + a - S[ind,"C"])),,,,,,,,,,,,,,,,,
             # Conditions for the investment value next period i_p
-            if S[ind,"I"] + a - S[ind,"C"] > P.i_bar ##
-                i_p = P.i_bar ##i_p = i_bar if the amount of investment this period plus the restock decision minus the consumption decision is greater than i_bar
-            else
-                i_p = S[ind,"I"] + a - S[ind,"C"] 
-            end 
+            # if S[ind,"I"] + a - S[ind,"C"] > P.i_bar ##
+            #     i_p = P.i_bar ##i_p = i_bar if the amount of investment this period plus the restock decision minus the consumption decision is greater than i_bar
+            # else
+            #     i_p = S[ind,"I"] + a - S[ind,"C"] 
+            # end 
+
+            i_p = minimum([S[ind,"I"] + a - S[ind,"C"],P.i_bar])
 
             if a == 0  ##If we choose not to restock
                 val_0 = payoff(P,R,a,S[ind,"I"],S[ind,"C"],S[ind,"P"])  ##Choice specific value function equals 
@@ -123,9 +128,9 @@ function value_func(P::params, R::results,S)
                  #R.val_func[i_p,1/2,.9*P.P_r +.1*P.P_s] = payoff(P,R,a,i_p,S[ind,"C"],S[ind,"P"]) + P.beta*0.5*(val_func[i_p,0,P.pr]*0.9 + val_func[i_p,0,P.ps]*0.1) + P.beta*0.5*(val_func[i_p,1,P.pr]*0.9 + val_func[i_p,1,P.ps]*0.1)
                 val0[findall(x->x==S[ind,"I"],P.i),findall(x->x==S[ind,"C"],P.c),findall(x->x==S[ind,"P"],P.p)] .= val_0 #Set choice 0 specific value function
                 #at a level of investment, consumption and price from this particular loop equal to val_0
-            else a == 1
+            else 
                 val_1 = payoff(P,R,a,S[ind,"I"],S[ind,"C"],S[ind,"P"]) 
-                + P.beta*0.5*((val_func[findall(x->x==i_p,P.i),findall(x->x==0,P.c),findall(x->x==4,P.p)])*0.9 + (val_func[findall(x->x==i_p,P.i),findall(x->x==0,P.c),findall(x->x==1,P.p)])*0.1) +
+                + P.beta*0.5*((val_func[findall(x->x==i_p,P.i),findall(x->x==0,P.c),findall(x->x==4,P.p)])*0.9 + (val_func[findall(x->x==i_p,P.i),findall(x->x==0,P.c),findall(x->x==1,P.p)])*0.1) 
                 + P.beta*0.5*((val_func[findall(x->x==i_p,P.i),findall(x->x==1,P.c),findall(x->x==4,P.p)])*0.9 + (val_func[findall(x->x==i_p,P.i),findall(x->x==1,P.c),findall(x->x==1,P.p)])*0.1)
                 val1[findall(x->x==S[ind,"I"],P.i),findall(x->x==S[ind,"C"],P.c),findall(x->x==S[ind,"P"],P.p)] .= val_1
 
@@ -172,7 +177,6 @@ end
 function expected_val_func(P::params,R::results)     ##Calculating the expected value function by weighting between the choice specific value functions
     exp_val_func = zeros(P.ni,P.nc,P.np)
     exp_val_vector = zeros(P.ns)
-
     val_func_0 = R.val_func_0
     val_func_1 = R.val_func_1
     v_tilde = R.val_func_1 .- val_func_0  ##Per the formula, subtract val0 from val1 to yield val tilde
@@ -195,6 +199,7 @@ function expected_val_func(P::params,R::results)     ##Calculating the expected 
     return exp_val_func,exp_val_vector
 end
 
+pr1,pr2= expected_val_func(P,R)
 function CCP(P::params,R::results)
     p_hat = zeros(P.ns)
     stat_id = unique(sim_data[:,"state_id"]) #Get a vector of the unique values of state_id column. Aka, get all unique state_ids. 
@@ -206,7 +211,7 @@ function CCP(P::params,R::results)
        #get the number of rows where the the state is the curent valuer of stat_id
         #for row in length(sim_data[sim_data.state_id.==stat,"choice"])
         number_restocking = size(sim_data[(sim_data.state_id.==stat_id[stat]).&& (sim_data.choice.==1),:])[1]
-        p_hat[stat] = number_restocking/numb_in_state
+        p_hat[stat] = number_restocking./numb_in_state
         println(p_hat[stat], stat)
         #numerator: the size of the subset of the simulation matrix where the state is the curent value of stat_id and 
         #the value of the choice column is 1(i.e., where the state is state_id[stat] and the individual chooses to restock)
@@ -225,6 +230,9 @@ function CCP(P::params,R::results)
     return p_hat
 end 
 
+#R.p_hat = CCP(P,R)
+#R.p_hat = 1 .- R.p_hat ##Initial Phat #
+#te = CCP#(P,R)
 function payoff_ccp(P::params, R::results,S)
     val_func = zeros(P.ni,P.nc,P.np)
     val_0 = 0
@@ -274,6 +282,17 @@ function payoff_ccp(P::params, R::results,S)
      return val_func,val0,val1   #Return the value function and the choice specific value functions                                                                              
 end
 
+valf,v0,v1 = payoff_ccp(P,R,S)
+# p_hat = exp(v1)./
+
+# mat_test = Array{Float64,2}
+# mt = [1 2;3 4]
+# mat_test = [v0 v1]
+# exp_test = exp.(mat_test)
+# sumr = sum(exp_test,dims=2)
+# p_hat = exp.(mat_test[:,2])./sumr
+# R.p_hat .= p_hat
+
 function vbar_ccp(P::params,R::results,S,p_hat)
     #p_hat = CCP(P,R)
     payoff, payoff_0, payoff_1 = payoff_ccp(P,R,S)
@@ -299,16 +318,22 @@ function vbar_ccp(P::params,R::results,S,p_hat)
     V_barp = inverse*weighted_v
     #println("var_p", V_barp)
 
-
-
-
-
     return V_barp,payoff_0,payoff_1,F
 end 
 
 
-function overall_ccp_iteration(P::params, R::results, tol::Float64 = 10^(-10))
+
+    
+
+
+#x,y,z,w = (-1).*vbar_ccp(P,R,S,CCP(P,R))
+
+
+
+
+function overall_ccp_iteration(P::params, R::results, tol::Float64 = 10^(-2))
     exp_val_func_ccp = zeros(P.ni,P.nc,P.np)
+    v_bar_new = zeros(P.ni,P.nc,P.np)
     payoff_0 = zeros(P.ns)
     payoff_1 = zeros(P.ns)
     new_phat = zeros(P.ns)
@@ -316,17 +341,43 @@ function overall_ccp_iteration(P::params, R::results, tol::Float64 = 10^(-10))
     v_tilde_ccp = zeros(P.ns)
     #payoff, payoff_0, payoff_1 = payoff_ccp(P,R)
     error = 100
+    error2 = 100
     n = 1
-    while error > tol   ##Set our threshold 
+    coef = fill(1/36,36)
+    while error > 10^(-2)   ##Set our threshold 
         n+=1 #Counter
+       
         exp_val_func_ccp,payoff_0, payoff_1, F = vbar_ccp(P,R,S,R.p_hat) #Run our value function 
+        error =norm(exp_val_func_ccp .- R.exp_val_func_ccp)
+        R.exp_val_func_ccp = exp_val_func_ccp
+        # mf = F_a0.*R.p_hat+ F_a1.*(R.p_hat)
+        # new_coef = mf'coef
+        # error = norm(new_coef .- coef)
+        # coef = new_coef
+        # println(size(mf))    
+        # #  R.exp_val_func_ccp .= v_bar_new
+        # for i = 1:36
+        #     R.exp_val_func_ccp[i] = mf[i,i]
+        # end
+        
+    end
+
+    while error2 > tol .&& n < 100
+        n+=1
         ##println("error ", maximum(abs.(new_val_func_ccp - R.val_func_ccp))) #Print the eror result to keep track of what is happening
         #println("F_a1",F_a1)
 
         #v_tilde_ccp = (P.beta*(F_a1*exp_val_func_ccp) .+ ((payoff_1))) .- ((payoff_0) .+ P.beta*(F_a0*exp_val_func_ccp))
         #println("v_tilde_ccp ",v_tilde_ccp)
         #new_phat = (1 .+ exp.((-1)*v_tilde_ccp))
+        exp_val_func_ccp,payoff_0, payoff_1, F = vbar_ccp(P,R,S,R.p_hat) #Run our value function 
+
         new_phat = (P.beta*(F_a1*exp_val_func_ccp) .+ ((payoff_1)))./((P.beta*(F_a1*exp_val_func_ccp) .+ ((payoff_1))) .+ ((payoff_0) .+ P.beta*(F_a0*exp_val_func_ccp)))
+        # mat_test = [payoff_0 payoff_1]
+        # exp_test = exp.(mat_test)
+        # sumr = sum(exp_test,dims=2)
+        # new_phat = exp.(mat_test[:,2])./sumr
+
         println(new_phat)
         #new_phat = Array(new_phat)
      #   #println(new_phat)
@@ -334,12 +385,13 @@ function overall_ccp_iteration(P::params, R::results, tol::Float64 = 10^(-10))
         ##println("error ", maximum(abs.(new_phat - R.p_hat))) #Print the eror result to keep track of what is happening
       #  #println(new_phat)
        # error = maximum(abs.(new_phat .- R.p_hat))
-       error = norm(new_phat .- R.p_hat)
-       println(error)
+       error2 = norm( R.p_hat .- new_phat)
+        #error2 = norm(new_phat .- R.p_hat) 
+        println(error2)
         #println(size(new_phat))
         ##println(new_phat)
-        R.p_hat = new_phat
-        R.exp_val_func_ccp = exp_val_func_ccp
+        R.p_hat .= new_phat
+        #R.exp_val_func_ccp = exp_val_func_ccp
 
         println("Iteration ", n) #Print the iteration value to keep track of what is happening
         
@@ -347,5 +399,62 @@ function overall_ccp_iteration(P::params, R::results, tol::Float64 = 10^(-10))
    println("Value functions converged in ", n, " iterations.")
 
 end
+
+x = zeros(36)
+
+y = fill(1/36,36)
+
+overall_ccp_iteration(P,R)
+
+
+function log_likelihood(P,R,S,p_hat)
+    V_barp,payoff_0,payoff_1,F = v_bar_ccp(P,R,S,p_hat) 
+    p_hat = ccp(P,R)
+    for i = 1:36
+    sid = sim_data[state_id = findall(x->x==S[i,"id"],sim_data.state_id)]
+     vL = p_hat[i]
+    end
+
+
+
+
+
+
+
+
+end 
+
+S[!,"U0"]= zeros(P.ns)
+S[!,"U1"] = zeros(P.ns)
+S[!,"EV"] = zeros(P.ns)
+S[!, "Phat"] = zeros(P.ns)
+
+
+S[1:9,"U0"]= R.val_func_0[:,1,1]
+S[10:18,"U0"] = R.val_func_0[:,2,1]
+S[19:27,"U0"] = R.val_func_0[:,1,2]
+
+S[28:36,"U0"] = R.val_func_0[:,2,2]
+
+S[1:9,"U1"]= R.val_func_1[:,1,1]
+S[10:18,"U1"] = R.val_func_1[:,2,1]
+S[19:27,"U1"] = R.val_func_1[:,1,2]
+
+S[28:36,"U1"] = R.val_func_1[:,2,2]
+
+ 
+S[1:9,"EV"]= R.exp_val_func_ccp[1:9]
+S[10:18,"EV"] = R.exp_val_func_ccp[10:18]
+S[19:27,"EV"] = R.exp_val_func_ccp[19:27]
+S[28:36,"EV"] = R.exp_val_func_ccp[28:36]
+
+S[1:9,"Phat"]= R.p_hat[1:9]
+S[10:18,"Phat"] = R.p_hat[10:18]
+S[19:27,"Phat"] = R.p_hat[19:27]
+S[28:36,"Phat"] = R.p_hat[28:36]
+
+
+
+v_bar_new = log.(exp.(payoff_0.+P.beta.*F_a0.*exp_val_func_ccp) .+ exp.(payoff_0.+P.beta.*F_a1.*exp_val_func_ccp)) .+ P.gamma
 
 
