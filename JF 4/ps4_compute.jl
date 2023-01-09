@@ -1,3 +1,4 @@
+
 using DataFrames, Random, Parameters, Distributions, Accessors, CSV, LinearAlgebra, Optim
 include("jf_ps4_code_ext.jl")
 
@@ -13,8 +14,10 @@ R.exp_val_func_ccp,payoff_0,payoff_1,F = vbar_ccp(P,R,S,sim_phat)
 #### Find Expected Value Function From CCP With Iteration Starting from Phat = 0.5
 
 overall_ccp_iteration(P,R)
-R.exp_val_func_ccp
+R.exp_val_func_ccpS
 
+update_s(P,R,S)
+S
 
 ##Question 4
 
