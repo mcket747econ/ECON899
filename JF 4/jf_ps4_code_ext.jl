@@ -1,8 +1,11 @@
-#using Pkg;Pkg.add("CSV") Load csv package in order to be able to load csv files
+#using DataFrames, Random, Parameters, Distributions, Accessors, CSV, LinearAlgebra, Optim
 
-using DataFrames, Random, Parameters, Distributions, Accessors, CSV, LinearAlgebra, Optim
 
-cd("/Users/jacobbills/Desktop/Economics/Econ 899/JF 4/")
+if splitdir(homedir())[end] == "mcket"
+    cd("C:/Users/mcket/OneDrive/Documents/Fall 2022/ECON899-Computational/899Code/JF_PS4")
+elseif splitdir(homedir())[end] == "jacobbills"
+    cd("/Users/jacobbills/Desktop/Economics/Econ 899/JF 4/")
+end
 
 S = DataFrame(CSV.File("./PS4/PS4_state_space.csv"))
 F_a00 = DataFrame(CSV.File("./PS4/PS4_transition_a0.csv"))
@@ -175,7 +178,8 @@ function expected_val_func(P::params,R::results)     ##Calculating the expected 
     
     e_0 = P.gamma .- log.(p_0s)
     e_1 = P.gamma .- log.(p_1s)
-    exp_val_func .= p_0s.*(val_func_0 .+ e_0) + p_1s.*(val_func_1 .+ e_1)
+    #exp_val_func .= p_0s.*(val_func_0 .+ e_0) + p_1s.*(val_func_1 .+ e_1)
+    exp_val_func .= log.(exp.(val_func_0) .+ exp.(val_func_1)) .+ P.gamma
     #exp_val_func = log()
     exp_val_vector[1:9] = exp_val_func[:,1,1]
     exp_val_vector[10:18] = exp_val_func[:,2,1]
@@ -340,10 +344,10 @@ function overall_ccp_iteration(P::params, R::results, tol::Float64 = 10^(-10))
         #new_phat = (1 .+ exp.((-1)*v_tilde_ccp))
         exp_val_func_ccp,payoff_0, payoff_1, F = vbar_ccp(P,R,S,R.p_hat) #Run our value function 
 
-        #new_phat = (P.beta*(F_a1*exp_val_func_ccp) .+ ((payoff_1)))./((P.beta*(F_a1*exp_val_func_ccp) .+ ((payoff_1))) .+ ((payoff_0) .+ P.beta*(F_a0*exp_val_func_ccp)))
-        new_phat = 1 ./(1 .+exp.(-((P.beta*(F_a1*exp_val_func_ccp) .+ ((payoff_1))) .-(P.beta*(F_a0*exp_val_func_ccp) .+ ((payoff_0))))))
+        new_phat .= exp.((P.beta*(F_a1*exp_val_func_ccp) .+ ((payoff_1))) .- ((payoff_0) .+ P.beta*(F_a0*exp_val_func_ccp)))./(1 .+ exp.((P.beta*(F_a1*exp_val_func_ccp) .+ ((payoff_1))) .- ((payoff_0) .+ P.beta*(F_a0*exp_val_func_ccp))))
+        # new_phat = 1 ./(1 .+exp.(-((P.beta*(F_a1*exp_val_func_ccp) .+ ((payoff_1))) .-(P.beta*(F_a0*exp_val_func_ccp) .+ ((payoff_0))))))
         
-        new_phat = [if new_phat[x] >= 0.001 && new_phat[x] <= .999 new_phat[x] elseif new_phat[x] > .999 .999 else .001 end for x=1:36] #constraining the frequency
+        # new_phat = [if new_phat[x] >= 0.001 && new_phat[x] <= .999 new_phat[x] elseif new_phat[x] > .999 .999 else .001 end for x=1:36] #constraining the frequency
         # mat_test = [payoff_0 payoff_1]
         # exp_test = exp.(mat_test)
         # sumr = sum(exp_test,dims=2)
@@ -406,4 +410,47 @@ function nfxp(P::params, R::results,data,l,tol1::Float64= 10e-2,tol2::Float64=10
     res = Optim.minimizer(opt)
     return res 
 end
+
+function update_s(P,R,S)
+
+    S[!,"U0"]= zeros(P.ns)
+    S[!,"U1"] = zeros(P.ns)
+    S[!,"EV"] = zeros(P.ns)
+    S[!,"EV_ccp"] = zeros(P.ns)
+    S[!, "Phat"] = zeros(P.ns)
+
+
+    S[1:9,"U0"]= R.val_func_0[:,1,1]
+    S[10:18,"U0"] = R.val_func_0[:,2,1]
+    S[19:27,"U0"] = R.val_func_0[:,1,2]
+
+    S[28:36,"U0"] = R.val_func_0[:,2,2]
+
+    S[1:9,"U1"]= R.val_func_1[:,1,1]
+    S[10:18,"U1"] = R.val_func_1[:,2,1]
+    S[19:27,"U1"] = R.val_func_1[:,1,2]
+
+    S[28:36,"U1"] = R.val_func_1[:,2,2]
+
+    
+   S[:,"EV"] = R.exp_val_vector
+
+    S[1:9,"EV_ccp"]= R.exp_val_func_ccp[1:9]
+    S[10:18,"EV_ccp"] = R.exp_val_func_ccp[10:18]
+    S[19:27,"EV_ccp"] = R.exp_val_func_ccp[19:27]
+    S[28:36,"EV_ccp"] = R.exp_val_func_ccp[28:36]
+
+    S[1:9,"Phat"]= R.p_hat[1:9]
+    S[10:18,"Phat"] = R.p_hat[10:18]
+    S[19:27,"Phat"] = R.p_hat[19:27]
+    S[28:36,"Phat"] = R.p_hat[28:36]
+
+
+end
+
+
+
+v_bar_new = log.(exp.(payoff_0.+P.beta.*F_a0.*exp_val_func_ccp) .+ exp.(payoff_0.+P.beta.*F_a1.*exp_val_func_ccp)) .+ P.gamma
+
+
 
