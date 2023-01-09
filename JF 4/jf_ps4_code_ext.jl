@@ -347,7 +347,7 @@ function overall_ccp_iteration(P::params, R::results, tol::Float64 = 10^(-10))
         new_phat .= exp.((P.beta*(F_a1*exp_val_func_ccp) .+ ((payoff_1))) .- ((payoff_0) .+ P.beta*(F_a0*exp_val_func_ccp)))./(1 .+ exp.((P.beta*(F_a1*exp_val_func_ccp) .+ ((payoff_1))) .- ((payoff_0) .+ P.beta*(F_a0*exp_val_func_ccp))))
         # new_phat = 1 ./(1 .+exp.(-((P.beta*(F_a1*exp_val_func_ccp) .+ ((payoff_1))) .-(P.beta*(F_a0*exp_val_func_ccp) .+ ((payoff_0))))))
         
-        # new_phat = [if new_phat[x] >= 0.001 && new_phat[x] <= .999 new_phat[x] elseif new_phat[x] > .999 .999 else .001 end for x=1:36] #constraining the frequency
+        new_phat = [if new_phat[x] >= 0.001 && new_phat[x] <= .999 new_phat[x] elseif new_phat[x] > .999 .999 else .001 end for x=1:36] #constraining the frequency
         # mat_test = [payoff_0 payoff_1]
         # exp_test = exp.(mat_test)
         # sumr = sum(exp_test,dims=2)
